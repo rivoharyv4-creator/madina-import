@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\StyledModuleExport;
 use App\Http\Requests\StoreModuleRequest;
 use App\Services\BusinessCalculator;
 use App\Services\NumberSequenceService;
@@ -13,6 +14,8 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
+use Maatwebsite\Excel\Excel as ExcelFormat;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ModuleController extends Controller
 {
@@ -443,9 +446,12 @@ class ModuleController extends Controller
 
     public function export(string $module)
     {
-        $config=$this->config($module); abort_unless(DB::getSchemaBuilder()->hasTable($config['table']),404); $rows=DB::table($config['table'])->orderByDesc('id')->get();
-        $out=fopen('php://temp','w+'); fwrite($out,"\xEF\xBB\xBF"); fputcsv($out,array_values($config['columns']),';'); foreach($rows as $row) fputcsv($out,array_map(fn($key)=>$row->{$key}??'',array_keys($config['columns'])),';'); rewind($out); $contents=stream_get_contents($out); fclose($out);
-        $filename=$module.'-'.now()->format('Y-m-d-His').'.csv'; $path=$this->storage->putExport($filename,$contents);
+        $config=$this->config($module); abort_unless(DB::getSchemaBuilder()->hasTable($config['table']),404);
+        $query=DB::table($config['table'])->orderByDesc('id');
+        if(DB::getSchemaBuilder()->hasColumn($config['table'],'deleted_at')) $query->whereNull('deleted_at');
+        $rows=$this->decorate($query->get()->map(fn($row)=>(array)$row)->all());
+        $contents=Excel::raw(new StyledModuleExport($module,$config['title'],$config['columns'],$rows),ExcelFormat::XLSX);
+        $filename=$module.'-'.now()->format('Y-m-d-His').'.xlsx'; $path=$this->storage->putExport($filename,$contents);
         return $this->storage->download($path,$filename);
     }
 }
