@@ -15,12 +15,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libfreetype6-dev \
         libjpeg62-turbo-dev \
         libpng-dev \
+        libsqlite3-dev \
         libwebp-dev \
     && docker-php-ext-configure gd \
         --with-freetype \
         --with-jpeg \
         --with-webp \
-    && docker-php-ext-install -j"$(nproc)" gd \
+    && docker-php-ext-install -j"$(nproc)" gd pdo_sqlite \
     && rm -rf /var/lib/apt/lists/*
 
 # --- Node.js (required to build the frontend assets) -----------------------
@@ -37,7 +38,7 @@ COPY . /app
 RUN composer install --no-dev --optimize-autoloader --no-interaction \
     && npm ci --include=dev \
     && npm run build \
-    && npm prune --omit=dev
+    && rm -rf /app/node_modules
 
 ENV PORT=8080
 EXPOSE 8080
