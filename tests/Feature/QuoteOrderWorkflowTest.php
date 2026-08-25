@@ -44,6 +44,19 @@ class QuoteOrderWorkflowTest extends TestCase
         Storage::disk('persistent')->assertExists($item->photo_path);
     }
 
+    public function test_quote_can_create_its_client_without_selecting_a_registered_client(): void
+    {
+        $this->actingAs($this->manager)->post('/modules/devis',[
+            'client_name'=>'Nouveau client devis','client_contact'=>'+261 34 55 555 55','client_type'=>'revendeur','valid_until'=>'2026-10-30','shipping_mode'=>'aerien','status'=>'brouillon','items'=>[[
+                'name'=>'Article test','quantity'=>1,'supplier_name'=>'Fournisseur libre','supplier_price'=>100000,'total'=>150000,
+            ]],
+        ])->assertRedirect('/modules/devis');
+
+        $client=DB::table('clients')->where('name','Nouveau client devis')->first();
+        $this->assertNotNull($client);
+        $this->assertDatabaseHas('quotes',['client_id'=>$client->id,'client_name'=>'Nouveau client devis','contact'=>'+261 34 55 555 55']);
+    }
+
     public function test_order_form_exposes_quote_templates_and_order_keeps_quote_link_and_photo(): void
     {
         $quote=DB::table('quotes')->where('number','DV-MI-2026-001')->first();
