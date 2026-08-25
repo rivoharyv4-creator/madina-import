@@ -41,6 +41,8 @@ ADMIN_PASSWORD=un-secret-fort-uniquement-pour-l-initialisation
 SESSION_DRIVER=database
 CACHE_STORE=database
 QUEUE_CONNECTION=sync
+
+RAILPACK_PRUNE_DEPS=false
 ```
 
 Railway fournit automatiquement `PORT`, `RAILWAY_VOLUME_NAME` et `RAILWAY_VOLUME_MOUNT_PATH`. Le script refuse de démarrer si le volume déclaré n’est pas monté sur `/data` ou n’est pas inscriptible.
@@ -51,13 +53,9 @@ Exécuter localement `php artisan key:generate --show`, puis copier la valeur co
 
 ## 3. Build et démarrage
 
-Dans **Service > Settings**, conserver **Railpack** et saisir exactement :
+Dans **Service > Settings**, conserver **Railpack** et laisser **Build Command vide**. Railpack détecte Laravel, installe Composer et npm, puis exécute automatiquement le build Vite. Une commande personnalisée avec `composer install`, `npm ci` et `npm run build` ferait le même travail une seconde fois.
 
-Commande de build :
-
-```bash
-composer install --no-dev --optimize-autoloader --no-interaction && npm ci --include=dev && npm run build && npm prune --omit=dev
-```
+La variable `RAILPACK_PRUNE_DEPS=false` est importante sur Railway Hobby : elle désactive le `npm prune --omit=dev --ignore-scripts` automatique qui peut dépasser la mémoire du builder et terminer avec le code 137. Les modules Node ne sont pas utilisés par le serveur PHP au runtime ; les assets compilés restent dans `public/build`.
 
 Commande de démarrage :
 
