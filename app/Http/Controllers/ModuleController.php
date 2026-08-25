@@ -57,10 +57,11 @@ class ModuleController extends Controller
         return Inertia::render('Module/Index',['module'=>$module,'config'=>$config,'rows'=>$rows,'query'=>$request->q,'flash'=>session('success')]);
     }
 
-    public function create(string $module)
+    public function create(Request $request, string $module)
     {
         $config=$this->config($module); abort_if(!$config['primary'],404);
-        return Inertia::render('Module/Form',['module'=>$module,'config'=>$config,'fields'=>$this->fields($module),'itemFields'=>$this->itemFields($module),'initialItems'=>$this->itemFields($module)?[$this->emptyItem($module)]:[],'initialPackages'=>[],'initialSupplierProducts'=>$module==='fournisseurs'?[]:null,'orderProducts'=>$this->orderProducts($module),'quoteTemplates'=>$this->quoteTemplates($module),'company'=>config('madina.company')]);
+        $prefill=$this->invoicePrefill($module,$request->integer('order_id'));
+        return Inertia::render('Module/Form',['module'=>$module,'config'=>$config,'fields'=>$this->fields($module),'prefill'=>$prefill,'itemFields'=>$this->itemFields($module),'initialItems'=>$this->itemFields($module)?[$this->emptyItem($module)]:[],'initialPackages'=>[],'initialSupplierProducts'=>$module==='fournisseurs'?[]:null,'orderProducts'=>$this->orderProducts($module),'orderTemplates'=>$this->orderTemplates($module),'quoteTemplates'=>$this->quoteTemplates($module),'company'=>config('madina.company')]);
     }
 
     public function edit(string $module, int $id)
@@ -68,7 +69,7 @@ class ModuleController extends Controller
         $config=$this->config($module); abort_unless($config['editable']??false,404); $query=DB::table($config['table']); if(DB::getSchemaBuilder()->hasColumn($config['table'],'deleted_at')) $query->whereNull('deleted_at'); $record=$query->find($id); abort_unless($record,404);
         $values=$this->editValues($module,$record);
         $fields=array_map(function($field) use($values){ if(array_key_exists($field['name'],$values)) $field['default']=$values[$field['name']]; if($field['type']==='file'&&!empty($values['photo_path'])) $field['preview']='/product-photo/'.basename($values['photo_path']); if($field['name']==='proof'&&!empty($values['proof_path'])) $field['preview']='/purchase-proof/'.basename($values['proof_path']); return $field; },$this->fields($module));
-        return Inertia::render('Module/Form',['module'=>$module,'config'=>[...$config,'primary'=>'Modifier '.$config['title']],'fields'=>$fields,'recordId'=>$id,'itemFields'=>$this->itemFields($module),'initialItems'=>$this->existingItems($module,$id),'initialPackages'=>$this->existingPackages($module,$id),'initialSupplierProducts'=>$this->supplierProducts($module,$id),'orderProducts'=>$this->orderProducts($module),'quoteTemplates'=>$this->quoteTemplates($module),'company'=>config('madina.company')]);
+        return Inertia::render('Module/Form',['module'=>$module,'config'=>[...$config,'primary'=>'Modifier '.$config['title']],'fields'=>$fields,'recordId'=>$id,'prefill'=>[],'itemFields'=>$this->itemFields($module),'initialItems'=>$this->existingItems($module,$id),'initialPackages'=>$this->existingPackages($module,$id),'initialSupplierProducts'=>$this->supplierProducts($module,$id),'orderProducts'=>$this->orderProducts($module),'orderTemplates'=>$this->orderTemplates($module),'quoteTemplates'=>$this->quoteTemplates($module),'company'=>config('madina.company')]);
     }
 
     public function show(string $module, int $id)
@@ -442,6 +443,21 @@ class ModuleController extends Controller
     {
         if(!in_array($module,['factures','logistique'],true)) return [];
         return DB::table('order_items')->orderBy('id')->get()->groupBy('order_id')->map(fn($items)=>$items->map(fn($item)=>['name'=>$item->name,'specifications'=>$item->specifications,'quantity'=>$item->quantity,'photo_url'=>$item->photo_path?'/product-photo/'.basename($item->photo_path):null])->values()->all())->all();
+    }
+
+    private function orderTemplates(string $module): array
+    {
+        if($module!=='factures') return [];
+        return DB::table('orders')->whereNull('deleted_at')->orderByDesc('id')->get()->map(fn($order)=>['id'=>$order->id,'number'=>$order->number,'client_id'=>$order->client_id,'subtotal'=>(float)$order->client_total,'paid_amount'=>(float)$order->deposit,'balance_due'=>(float)$order->balance_due])->keyBy('id')->all();
+    }
+
+    private function invoicePrefill(string $module, int $orderId): array
+    {
+        if($module!=='factures'||!$orderId) return [];
+        $order=DB::table('orders')->whereNull('deleted_at')->find($orderId);
+        if(!$order) return [];
+        $paid=(float)$order->deposit; $total=(float)$order->client_total;
+        return ['order_id'=>$order->id,'type'=>'produits','issued_at'=>today()->toDateString(),'subtotal'=>$total,'paid_amount'=>$paid,'status'=>$paid>=$total?'payee':($paid>0?'partielle':'brouillon')];
     }
 
     private function quoteTemplates(string $module): array

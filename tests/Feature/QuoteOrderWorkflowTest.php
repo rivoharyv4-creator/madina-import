@@ -93,4 +93,23 @@ class QuoteOrderWorkflowTest extends TestCase
         $this->assertNotNull($client);
         $this->assertDatabaseHas('orders',['client_id'=>$client->id,'status'=>'achat_effectue']);
     }
+
+    public function test_manager_can_start_a_prefilled_invoice_from_an_order(): void
+    {
+        $order=DB::table('orders')->where('number','MI-2026-001')->first();
+
+        $this->actingAs($this->manager)->get('/modules/factures/create?order_id='.$order->id)->assertInertia(fn(Assert $page)=>$page
+            ->where('module','factures')
+            ->where('prefill.order_id',$order->id)
+            ->where('prefill.subtotal',(int)$order->client_total)
+            ->where('prefill.paid_amount',(int)$order->deposit)
+            ->where('orderTemplates.'.$order->id.'.number',$order->number)
+        );
+
+        $this->actingAs($this->manager)->post('/modules/factures',[
+            'order_id'=>$order->id,'type'=>'produits','issued_at'=>'2026-08-25','subtotal'=>$order->client_total,'paid_amount'=>$order->deposit,'status'=>'partielle',
+        ])->assertRedirect('/modules/factures');
+
+        $this->assertDatabaseHas('invoices',['order_id'=>$order->id,'client_id'=>$order->client_id,'subtotal'=>$order->client_total,'paid_amount'=>$order->deposit]);
+    }
 }

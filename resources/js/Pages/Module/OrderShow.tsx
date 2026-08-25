@@ -1,7 +1,7 @@
 import BrandLogo from '@/Components/BrandLogo';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link } from '@inertiajs/react';
-import { ArrowLeft, Box, CalendarDays, PackageCheck, Pencil, Printer, Ship, UserRound } from 'lucide-react';
+import { ArrowLeft, Box, CalendarDays, FilePlus2, PackageCheck, Pencil, Printer, Ship, UserRound } from 'lucide-react';
 
 const money=(value:any)=>new Intl.NumberFormat('de-DE',{maximumFractionDigits:0}).format(Number(value||0))+' Ar';
 const number=(value:any,maximumFractionDigits=3)=>new Intl.NumberFormat('fr-FR',{maximumFractionDigits}).format(Number(value||0));
@@ -13,7 +13,7 @@ export default function OrderShow({order,items,packages}:{order:any;items:any[];
  const totalCbm=packages.reduce((sum,item)=>sum+Number(item.volume_cbm||0),0);
  return <AuthenticatedLayout
   header={<><Link href="/modules/commandes" className="mb-3 inline-flex items-center gap-2 text-xs font-semibold text-gray-400 hover:text-[#BD2433]"><ArrowLeft size={14}/>Retour aux commandes</Link><p className="eyebrow">Aperçu de la commande</p><h1 className="page-title">{order.number}</h1><p className="mt-1 text-sm text-gray-400">Produits réels, photos, colis et informations financières.</p></>}
-  action={<div className="flex gap-2 print:hidden"><button type="button" onClick={()=>window.print()} className="btn-secondary"><Printer size={16}/>Imprimer</button><Link href={`/modules/commandes/${order.id}/edit`} className="btn-primary"><Pencil size={16}/>Modifier</Link></div>}
+  action={<div className="flex flex-wrap gap-2 print:hidden"><button type="button" onClick={()=>window.print()} className="btn-secondary"><Printer size={16}/>Imprimer</button><Link href={`/modules/factures/create?order_id=${order.id}`} className="btn-secondary"><FilePlus2 size={16}/>Créer une facture</Link><Link href={`/modules/commandes/${order.id}/edit`} className="btn-primary"><Pencil size={16}/>Modifier</Link></div>}
  >
   <Head title={`Commande ${order.number}`}/>
   <div className="mx-auto max-w-6xl space-y-5">
