@@ -71,6 +71,13 @@ class PersistentStorageService
         return Storage::disk('persistent')->download($path,$downloadName);
     }
 
+    public function dataUri(?string $path): ?string
+    {
+        if(!$path||!Storage::disk('persistent')->exists($path)) return null;
+        $mime=Storage::disk('persistent')->mimeType($path)?:'image/jpeg';
+        return 'data:'.$mime.';base64,'.base64_encode(Storage::disk('persistent')->get($path));
+    }
+
     private function storeFile(?UploadedFile $file, string $directory): ?string
     {
         $this->ensureDirectories();

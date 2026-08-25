@@ -186,12 +186,12 @@ class ModuleCreationTest extends TestCase
         $this->assertSame(3,DB::table('order_package_items')->join('order_packages','order_packages.id','=','order_package_items.order_package_id')->where('order_packages.order_id',$order->id)->count());
     }
 
-    public function test_quotes_have_no_photo_input_while_invoice_and_tracking_receive_real_order_products(): void
+    public function test_quotes_accept_product_photos_while_invoice_and_tracking_receive_real_order_products(): void
     {
         $order=DB::table('orders')->first(); $item=DB::table('order_items')->where('order_id',$order->id)->first();
         DB::table('order_items')->where('id',$item->id)->update(['photo_path'=>'product-photos/real-item.jpg']);
 
-        $this->actingAs($this->manager)->get('/modules/devis/create')->assertInertia(fn(Assert $page)=>$page->where('module','devis')->where('itemFields',fn($fields)=>!collect($fields)->contains(fn($field)=>$field['name']==='photo')));
+        $this->actingAs($this->manager)->get('/modules/devis/create')->assertInertia(fn(Assert $page)=>$page->where('module','devis')->where('itemFields',fn($fields)=>collect($fields)->contains(fn($field)=>$field['name']==='photo')));
         foreach(['factures','logistique'] as $module) {
             $this->actingAs($this->manager)->get("/modules/{$module}/create")->assertInertia(fn(Assert $page)=>$page->where('module',$module)->where('orderProducts',fn($groups)=>collect($groups[$order->id]??[])->contains(fn($product)=>$product['photo_url']==='/product-photo/real-item.jpg')));
         }

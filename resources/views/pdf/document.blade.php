@@ -25,6 +25,7 @@
         .lines td { border-bottom: 1px solid #ecece8; padding: 11px 9px; vertical-align: top; }
         .lines .qty { width: 70px; text-align: center; }
         .lines .amount { width: 135px; text-align: right; white-space: nowrap; }
+        .product-photo { width: 54px; max-height: 54px; object-fit: contain; vertical-align: middle; margin-right: 8px; }
         .description { color: #777; font-size: 9px; margin-top: 3px; }
         .totals { width: 310px; margin: 18px 0 0 auto; border-collapse: collapse; }
         .totals td { padding: 6px 10px; }
@@ -41,7 +42,7 @@
     <table class="header">
         <tr>
             <td style="width:110px">@if($logoData)<img class="logo" src="{{ $logoData }}" alt="Madina Import">@endif</td>
-            <td><div class="brand">MADINA IMPORT</div><div class="tagline">Importation &amp; intermédiation · Madagascar</div></td>
+            <td><div class="brand">{{ $company['name'] }}</div><div class="tagline">{{ $company['email'] }} · {{ $company['contact'] }}<br>{{ $company['address'] }}</div></td>
             <td><div class="document-title">{{ $title }}</div><div class="number">N° {{ $document->number }}</div></td>
         </tr>
     </table>
@@ -49,7 +50,7 @@
     <table class="meta">
         <tr>
             <td><div class="box"><div class="label">Destinataire</div><div class="client">{{ $document->client_name }}</div><div>{{ $document->client_number }}</div><div>{{ $document->client_contact }}</div>@if($document->client_address)<div>{{ $document->client_address }}</div>@endif</div></td>
-            <td><div class="box box-right"><div class="label">Informations du document</div><div style="margin-top:5px"><strong>Date :</strong> {{ \Carbon\Carbon::parse($module==='devis'?($document->sent_at?:$document->created_at):$document->issued_at)->format('d/m/Y') }}</div>@if($module==='devis')<div><strong>Valide jusqu’au :</strong> {{ \Carbon\Carbon::parse($document->valid_until)->format('d/m/Y') }}</div>@else<div><strong>Commande :</strong> {{ $document->order_number }}</div>@endif<div class="status">{{ str_replace('_',' ',$document->status) }}</div></div></td>
+            <td><div class="box box-right"><div class="label">Informations du document</div><div style="margin-top:5px"><strong>Date :</strong> {{ \Carbon\Carbon::parse($module==='devis'?($document->sent_at?:$document->created_at):$document->issued_at)->format('d/m/Y') }}</div>@if($module==='devis')<div><strong>Valide jusqu’au :</strong> {{ \Carbon\Carbon::parse($document->valid_until)->format('d/m/Y') }}</div><div><strong>Mode d’envoi :</strong> {{ ucfirst($document->shipping_mode?:'Non défini') }}</div>@else<div><strong>Commande :</strong> {{ $document->order_number }}</div>@endif<div class="status">{{ str_replace('_',' ',$document->status) }}</div></div></td>
         </tr>
     </table>
 
@@ -58,9 +59,9 @@
         <tbody>
         @foreach($items as $item)
             <tr>
-                <td><strong>{{ $module==='devis'?$item->name:$item->label }}</strong>@if($module==='devis' && $item->specifications)<div class="description">{{ $item->specifications }}</div>@endif</td>
+                <td>@if($module==='devis' && $item->photo_data)<img class="product-photo" src="{{ $item->photo_data }}" alt="">@endif<strong>{{ $module==='devis'?$item->name:$item->label }}</strong>@if($module==='devis' && $item->specifications)<div class="description">{{ $item->specifications }}</div>@endif @if($module==='devis' && $item->supplier_name)<div class="description">Fournisseur : {{ $item->supplier_name }}@if($item->supplier_contact) · {{ $item->supplier_contact }}@endif</div>@endif</td>
                 @if($module==='devis')<td class="qty">{{ rtrim(rtrim(number_format((float)$item->quantity,3,',',' '),'0'),',') }}</td>@endif
-                <td class="amount">{{ number_format((float)($module==='devis'?$item->total:$item->amount),0,',',' ') }} Ar</td>
+                <td class="amount">{{ number_format((float)($module==='devis'?$item->total:$item->amount),0,',','.') }} Ar</td>
             </tr>
         @endforeach
         </tbody>
@@ -71,11 +72,11 @@
     @endif
 
     <table class="totals">
-        @if($module==='factures')<tr><td>Déjà payé</td><td class="value">{{ number_format((float)$document->paid_amount,0,',',' ') }} Ar</td></tr><tr><td>Reste à payer</td><td class="value">{{ number_format((float)$document->balance_due,0,',',' ') }} Ar</td></tr>@endif
-        <tr class="grand"><td>Total</td><td class="value">{{ number_format((float)($module==='devis'?$document->total:$document->subtotal),0,',',' ') }} Ar</td></tr>
+        @if($module==='devis')<tr><td>Prix total sans marge</td><td class="value">{{ number_format(max(0,(float)$document->total-(float)$document->margin),0,',','.') }} Ar</td></tr><tr><td>Marge</td><td class="value">{{ number_format((float)$document->margin,0,',','.') }} Ar</td></tr>@else<tr><td>Déjà payé</td><td class="value">{{ number_format((float)$document->paid_amount,0,',','.') }} Ar</td></tr><tr><td>Reste à payer</td><td class="value">{{ number_format((float)$document->balance_due,0,',','.') }} Ar</td></tr>@endif
+        <tr class="grand"><td>Total</td><td class="value">{{ number_format((float)($module==='devis'?$document->total:$document->subtotal),0,',','.') }} Ar</td></tr>
     </table>
 
-    @if($module==='devis' && $document->notes)<div class="notes"><strong>Notes</strong><br>{{ $document->notes }}</div>@endif
-    <div class="footer">MADINA IMPORT · Document généré le {{ now()->format('d/m/Y à H:i') }} · {{ $document->number }}</div>
+    @if($module==='devis')<div class="notes"><strong>Informations et conditions</strong>@if($document->shipping_delay)<br><strong>Délai d’expédition :</strong> {{ $document->shipping_delay }}@endif @if($document->bank_details)<br><strong>Informations bancaires :</strong> {!! nl2br(e($document->bank_details)) !!}@endif @if($document->payment_terms)<br><strong>Conditions de paiement :</strong> {!! nl2br(e($document->payment_terms)) !!}@endif @if($document->warranty)<br><strong>Garantie :</strong> {!! nl2br(e($document->warranty)) !!}@endif @if($document->notes)<br><strong>Note / remarque :</strong> {!! nl2br(e($document->notes)) !!}@endif</div>@endif
+    <div class="footer">{{ $company['name'] }} · Document généré le {{ now()->format('d/m/Y à H:i') }} · {{ $document->number }}</div>
 </body>
 </html>

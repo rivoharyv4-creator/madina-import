@@ -1,0 +1,83 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\User;
+use Database\Seeders\DatabaseSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Inertia\Testing\AssertableInertia as Assert;
+use Tests\TestCase;
+
+class QuoteOrderWorkflowTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private User $manager;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Storage::fake('persistent');
+        $this->seed(DatabaseSeeder::class);
+        $this->manager=User::where('email','manager@madina-import.mg')->firstOrFail();
+    }
+
+    public function test_quote_stores_custom_client_supplier_shipping_terms_status_and_photo(): void
+    {
+        $client=DB::table('clients')->first();
+        $this->actingAs($this->manager)->post('/modules/devis',[
+            'client_id'=>$client->id,'client_name'=>'Nom personnalisé','client_contact'=>'+261 34 99 999 99','valid_until'=>'2026-10-30','shipping_mode'=>'maritime','shipping_delay'=>'45 à 60 jours','bank_details'=>'BOA 00001','payment_terms'=>'50 % commande, 50 % livraison','warranty'=>'12 mois','notes'=>'Couleur à confirmer','status'=>'relance_1','items'=>[[
+                'name'=>'Table sur mesure','photo'=>UploadedFile::fake()->image('table.jpg'),'quantity'=>2,'supplier_name'=>'Atelier manuel','supplier_contact'=>'WeChat atelier-88','supplier_price'=>1000000,'china_delivery'=>100000,'packaging'=>50000,'freight'=>300000,'margin'=>400000,'commission'=>0,'total'=>2850000,
+            ]],
+        ])->assertRedirect('/modules/devis');
+
+        $quote=DB::table('quotes')->where('client_name','Nom personnalisé')->first();
+        $this->assertSame('relance_1',$quote->status);
+        $this->assertSame('maritime',$quote->shipping_mode);
+        $this->assertSame('BOA 00001',$quote->bank_details);
+        $item=DB::table('quote_items')->where('quote_id',$quote->id)->first();
+        $this->assertSame('Atelier manuel',$item->supplier_name);
+        $this->assertNotNull($item->photo_path);
+        Storage::disk('persistent')->assertExists($item->photo_path);
+    }
+
+    public function test_order_form_exposes_quote_templates_and_order_keeps_quote_link_and_photo(): void
+    {
+        $quote=DB::table('quotes')->where('number','DV-MI-2026-001')->first();
+        $quoteItem=DB::table('quote_items')->where('quote_id',$quote->id)->first();
+        DB::table('quote_items')->where('id',$quoteItem->id)->update(['photo_path'=>'products/from-quote.jpg','supplier_name'=>'Fournisseur devis','supplier_contact'=>'WeChat 123']);
+
+        $this->actingAs($this->manager)->get('/modules/commandes/create')->assertInertia(fn(Assert $page)=>$page
+            ->where('quoteTemplates.'.$quote->id.'.number',$quote->number)
+            ->where('quoteTemplates.'.$quote->id.'.items.0.client_total',(int)$quoteItem->total)
+        );
+
+        $this->actingAs($this->manager)->post('/modules/commandes',[
+            'quote_id'=>$quote->id,'client_id'=>$quote->client_id,'ordered_at'=>'2026-08-25','shipping_mode'=>'maritime','status'=>'acompte_recu','deposit'=>1000000,'commission_enabled'=>1,'commission_rate'=>8,'items'=>[[
+                'quote_item_id'=>$quoteItem->id,'name'=>$quoteItem->name,'quantity'=>$quoteItem->quantity,'supplier_id'=>$quoteItem->supplier_id,'supplier_name'=>'Fournisseur devis','supplier_contact'=>'WeChat 123','supplier_price'=>$quoteItem->supplier_price,'china_delivery'=>$quoteItem->china_delivery,'packaging'=>$quoteItem->packaging,'weight'=>$quoteItem->estimated_weight,'cbm'=>$quoteItem->estimated_cbm,'freight'=>$quoteItem->estimated_freight,'margin'=>$quoteItem->margin,'commission'=>$quoteItem->commission,'client_total'=>$quoteItem->total,
+            ]],
+        ])->assertRedirect('/modules/commandes');
+
+        $order=DB::table('orders')->latest('id')->first();
+        $this->assertSame($quote->id,$order->quote_id);
+        $this->assertSame('devis',$order->origin);
+        $this->assertSame('acompte_recu',$order->status);
+        $this->assertDatabaseHas('order_items',['order_id'=>$order->id,'photo_path'=>'products/from-quote.jpg','supplier_name'=>'Fournisseur devis']);
+    }
+
+    public function test_manager_can_create_a_client_inside_a_new_order(): void
+    {
+        $this->actingAs($this->manager)->post('/modules/commandes',[
+            'new_client_name'=>'Client express','new_client_contact'=>'+261 32 11 222 33','new_client_type'=>'entrepreneur','new_client_address'=>'Antsirabe','ordered_at'=>'2026-08-25','status'=>'achat_effectue','commission_enabled'=>0,'deposit'=>0,'items'=>[[
+                'name'=>'Article express','quantity'=>1,'supplier_price'=>100000,'client_total'=>150000,
+            ]],
+        ])->assertRedirect('/modules/commandes');
+
+        $client=DB::table('clients')->where('name','Client express')->first();
+        $this->assertNotNull($client);
+        $this->assertDatabaseHas('orders',['client_id'=>$client->id,'status'=>'achat_effectue']);
+    }
+}
