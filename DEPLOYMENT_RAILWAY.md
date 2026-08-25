@@ -55,7 +55,7 @@ Exécuter localement `php artisan key:generate --show`, puis copier la valeur co
 
 Dans **Service > Settings**, conserver **Railpack** et laisser **Build Command vide**. Railpack détecte Laravel, installe Composer et npm, puis exécute automatiquement le build Vite. Une commande personnalisée avec `composer install`, `npm ci` et `npm run build` ferait le même travail une seconde fois.
 
-La variable `RAILPACK_PRUNE_DEPS=false` est importante sur Railway Hobby : elle désactive le `npm prune --omit=dev --ignore-scripts` automatique qui peut dépasser la mémoire du builder et terminer avec le code 137. Les modules Node ne sont pas utilisés par le serveur PHP au runtime ; les assets compilés restent dans `public/build`.
+Le fichier `railpack.json` remplace l’étape `npm prune --omit=dev --ignore-scripts` automatique par une opération sans effet. Cette étape peut dépasser la mémoire du builder Hobby et terminer avec le code 137. La variable `RAILPACK_PRUNE_DEPS=false` reste documentée comme protection supplémentaire. Les modules Node ne sont pas utilisés par le serveur PHP au runtime ; les assets compilés restent dans `public/build`.
 
 Commande de démarrage :
 

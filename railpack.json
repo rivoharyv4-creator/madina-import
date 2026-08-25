@@ -1,0 +1,11 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "steps": {
+    "prune": {
+      "commands": ["true"]
+    }
+  },
+  "deploy": {
+    "startCommand": "sh scripts/railway-start.sh"
+  }
+}
