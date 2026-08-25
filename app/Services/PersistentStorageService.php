@@ -56,6 +56,15 @@ class PersistentStorageService
         return $path;
     }
 
+    public function putDocumentPdf(string $directory, string $filename, string $contents): string
+    {
+        abort_unless(in_array($directory,['quotes','invoices'],true),404);
+        $this->ensureDirectories();
+        $path=$directory.'/'.basename($filename);
+        Storage::disk('persistent')->put($path,$contents);
+        return $path;
+    }
+
     public function download(string $path, string $downloadName): StreamedResponse
     {
         abort_unless(Storage::disk('persistent')->exists($path),404);

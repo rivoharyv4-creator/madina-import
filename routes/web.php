@@ -23,6 +23,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/modules/{module}/create', [ModuleController::class, 'create'])->name('modules.create');
     Route::post('/modules/{module}', [ModuleController::class, 'store'])->name('modules.store');
     Route::get('/modules/{module}/{id}/edit', [ModuleController::class, 'edit'])->whereNumber('id')->name('modules.edit');
+    Route::get('/modules/{module}/{id}/pdf', [ModuleController::class, 'pdf'])->whereIn('module',['devis','factures'])->whereNumber('id')->name('modules.pdf');
     Route::get('/modules/{module}/{id}', [ModuleController::class, 'show'])->whereNumber('id')->name('modules.show');
     Route::put('/modules/{module}/{id}', [ModuleController::class, 'update'])->whereNumber('id')->name('modules.update');
     Route::delete('/modules/employes/{id}', [ModuleController::class, 'destroyEmployee'])->whereNumber('id')->name('employees.destroy');

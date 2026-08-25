@@ -6,6 +6,7 @@ use App\Http\Requests\StoreModuleRequest;
 use App\Services\BusinessCalculator;
 use App\Services\NumberSequenceService;
 use App\Services\PersistentStorageService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
@@ -99,6 +100,45 @@ class ModuleController extends Controller
         })->values();
 
         return Inertia::render('Module/OrderShow',['order'=>$order,'items'=>$items,'packages'=>$packages]);
+    }
+
+    public function pdf(string $module, int $id)
+    {
+        abort_unless(in_array($module,['devis','factures'],true),404);
+
+        if($module==='devis'){
+            $document=DB::table('quotes')
+                ->join('clients','clients.id','=','quotes.client_id')
+                ->whereNull('quotes.deleted_at')
+                ->where('quotes.id',$id)
+                ->select('quotes.*','clients.number as client_number','clients.name as client_name','clients.contact as client_contact','clients.address as client_address')
+                ->first();
+            abort_unless($document,404);
+            $items=DB::table('quote_items')->where('quote_id',$id)->orderBy('id')->get();
+            $title='DEVIS';
+            $directory='quotes';
+        }else{
+            $document=DB::table('invoices')
+                ->join('clients','clients.id','=','invoices.client_id')
+                ->join('orders','orders.id','=','invoices.order_id')
+                ->whereNull('invoices.deleted_at')
+                ->where('invoices.id',$id)
+                ->select('invoices.*','clients.number as client_number','clients.name as client_name','clients.contact as client_contact','clients.address as client_address','orders.number as order_number')
+                ->first();
+            abort_unless($document,404);
+            $items=collect(json_decode($document->lines??'[]',false)?:[]);
+            $document->products=DB::table('order_items')->where('order_id',$document->order_id)->orderBy('id')->get(['name','specifications','quantity']);
+            $title='FACTURE';
+            $directory='invoices';
+        }
+
+        $logoPath=public_path('brand/madina-import-logo-transparent.png');
+        $logoData=file_exists($logoPath)?'data:image/png;base64,'.base64_encode(file_get_contents($logoPath)):null;
+        $contents=Pdf::loadView('pdf.document',compact('module','document','items','title','logoData'))->setPaper('a4')->output();
+        $filename=preg_replace('/[^A-Za-z0-9_-]+/','-',$document->number).'.pdf';
+        $path=$this->storage->putDocumentPdf($directory,$filename,$contents);
+
+        return $this->storage->download($path,$filename);
     }
 
     public function update(StoreModuleRequest $request, string $module, int $id, BusinessCalculator $calculator)
