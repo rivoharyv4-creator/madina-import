@@ -159,11 +159,11 @@ class ModuleCreationTest extends TestCase
 
     public function test_products_accept_photos_and_an_order_can_be_split_into_measured_packages(): void
     {
-        Storage::fake('public');
+        Storage::fake('persistent');
         $photo=UploadedFile::fake()->image('article.webp',600,600);
         $this->actingAs($this->manager)->post('/modules/stock',['name'=>'Article photographié','photo'=>$photo,'quantity'=>4,'purchase_price'=>50000,'sale_price'=>85000,'alert_threshold'=>1])->assertRedirect('/modules/stock');
         $photoPath=DB::table('inventory_products')->where('name','Article photographié')->value('photo_path');
-        $this->assertNotNull($photoPath); Storage::disk('public')->assertExists($photoPath);
+        $this->assertNotNull($photoPath); Storage::disk('persistent')->assertExists($photoPath);
         $stockId=DB::table('inventory_products')->where('name','Article photographié')->value('id');
         $this->actingAs($this->manager)->post("/modules/stock/{$stockId}",['_method'=>'put','name'=>'Article photographié corrigé','quantity'=>4,'purchase_price'=>50000,'sale_price'=>90000,'alert_threshold'=>1])->assertRedirect('/modules/stock');
         $this->assertSame($photoPath,DB::table('inventory_products')->where('id',$stockId)->value('photo_path'));
@@ -182,7 +182,7 @@ class ModuleCreationTest extends TestCase
         ])->assertRedirect('/modules/commandes');
         $order=DB::table('orders')->where('notes','Commande avec colis test')->first();
         $this->assertSame(0.14,(float)$order->cbm); $this->assertSame(2,DB::table('order_packages')->where('order_id',$order->id)->count());
-        $orderPhoto=DB::table('order_items')->where('order_id',$order->id)->where('name','Assiettes')->value('photo_path'); $this->assertNotNull($orderPhoto); Storage::disk('public')->assertExists($orderPhoto);
+        $orderPhoto=DB::table('order_items')->where('order_id',$order->id)->where('name','Assiettes')->value('photo_path'); $this->assertNotNull($orderPhoto); Storage::disk('persistent')->assertExists($orderPhoto);
         $this->assertSame(3,DB::table('order_package_items')->join('order_packages','order_packages.id','=','order_package_items.order_package_id')->where('order_packages.order_id',$order->id)->count());
     }
 
@@ -220,7 +220,7 @@ class ModuleCreationTest extends TestCase
 
     public function test_supplier_purchase_accepts_a_proof_capture_and_link(): void
     {
-        Storage::fake('public');
+        Storage::fake('persistent');
         $supplier=DB::table('suppliers')->first();
         $order=DB::table('orders')->first();
         $this->actingAs($this->manager)->post('/modules/achats',[
@@ -231,7 +231,7 @@ class ModuleCreationTest extends TestCase
         $payment=DB::table('supplier_payments')->where('reference','ALI-PROOF-001')->first();
         $this->assertNotNull($payment->proof_path);
         $this->assertSame('https://example.test/payment/ALI-PROOF-001',$payment->proof_url);
-        Storage::disk('public')->assertExists($payment->proof_path);
+        Storage::disk('persistent')->assertExists($payment->proof_path);
         $this->actingAs($this->manager)->get("/modules/achats/{$payment->id}/edit")->assertInertia(fn(Assert $page)=>$page
             ->where('module','achats')
             ->where('fields',fn($fields)=>collect($fields)->contains(fn($field)=>$field['name']==='proof'&&$field['preview']==='/purchase-proof/'.basename($payment->proof_path)))

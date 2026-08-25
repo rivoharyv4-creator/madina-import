@@ -1,36 +1,24 @@
 <?php
 
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\BrandAssetController;
 use App\Http\Controllers\ModuleController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SecureFileController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-Route::get('/brand-logo-transparent', function () {
-    return response()->file(public_path('brand/madina-import-logo-transparent.png'), [
-        'Content-Type' => 'image/png',
-        'Cache-Control' => 'public, max-age=3600',
-    ]);
-})->name('brand.logo');
-
-Route::get('/product-photo/{filename}', function (string $filename) {
-    $path = storage_path('app/public/product-photos/'.basename($filename));
-    abort_unless(is_file($path), 404);
-
-    return response()->file($path, ['Cache-Control' => 'public, max-age=86400']);
-})->where('filename', '[A-Za-z0-9._-]+')->name('product.photo');
+Route::get('/brand-logo-transparent',BrandAssetController::class)->name('brand.logo');
 
 Route::redirect('/', '/dashboard');
 
 Route::get('/dashboard', DashboardController::class)->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
-    Route::get('/purchase-proof/{filename}', function (string $filename) {
-        $path=storage_path('app/public/purchase-proofs/'.basename($filename));
-        abort_unless(is_file($path),404);
-        return response()->file($path,['Cache-Control'=>'private, max-age=3600']);
-    })->where('filename','[A-Za-z0-9._-]+')->name('purchase.proof');
+    Route::get('/product-photo/{filename}',[SecureFileController::class,'product'])->where('filename','[A-Za-z0-9._-]+')->name('product.photo');
+    Route::get('/purchase-proof/{filename}',[SecureFileController::class,'payment'])->where('filename','[A-Za-z0-9._-]+')->name('purchase.proof');
+    Route::get('/secure-files/{category}/{filename}',[SecureFileController::class,'show'])->whereIn('category',['product','payment','expense','invoice','quote','logistics'])->where('filename','[A-Za-z0-9._-]+')->name('secure-files.show');
     Route::get('/modules/{module}', [ModuleController::class, 'index'])->name('modules.index');
     Route::get('/modules/{module}/create', [ModuleController::class, 'create'])->name('modules.create');
     Route::post('/modules/{module}', [ModuleController::class, 'store'])->name('modules.store');

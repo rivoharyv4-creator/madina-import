@@ -30,6 +30,15 @@ return [
 
     'disks' => [
 
+        'persistent' => [
+            'driver' => 'local',
+            'root' => env('PERSISTENT_STORAGE_PATH') ?: storage_path('app/persistent'),
+            'serve' => false,
+            'visibility' => 'private',
+            'throw' => true,
+            'report' => true,
+        ],
+
         'private' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),

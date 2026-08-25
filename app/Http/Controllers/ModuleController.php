@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreModuleRequest;
 use App\Services\BusinessCalculator;
 use App\Services\NumberSequenceService;
+use App\Services\PersistentStorageService;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
@@ -14,6 +15,10 @@ use Inertia\Inertia;
 
 class ModuleController extends Controller
 {
+    public function __construct(private readonly PersistentStorageService $storage)
+    {
+    }
+
     private function config(string $module): array
     {
         return [
@@ -185,7 +190,7 @@ class ModuleController extends Controller
 
     private function storePhoto(?UploadedFile $photo): ?string
     {
-        return $photo?->store('product-photos','public');
+        return $this->storage->storeProduct($photo);
     }
 
     private function insertQuoteItems(int $quoteId, array $items, array $existingPhotos=[]): void
@@ -250,7 +255,7 @@ class ModuleController extends Controller
 
     private function storePurchaseProof(?UploadedFile $proof): ?string
     {
-        return $proof?->store('purchase-proofs','public');
+        return $this->storage->storePaymentProof($proof);
     }
 
     private function createLocalSale(array $data, int $userId): int
@@ -399,6 +404,8 @@ class ModuleController extends Controller
     public function export(string $module)
     {
         $config=$this->config($module); abort_unless(DB::getSchemaBuilder()->hasTable($config['table']),404); $rows=DB::table($config['table'])->orderByDesc('id')->get();
-        return response()->streamDownload(function() use($rows,$config){$out=fopen('php://output','w'); fwrite($out,"\xEF\xBB\xBF"); fputcsv($out,array_values($config['columns']),';'); foreach($rows as $row) fputcsv($out,array_map(fn($key)=>$row->{$key}??'',array_keys($config['columns'])),';'); fclose($out);},$module.'-'.now()->format('Y-m-d').'.csv',['Content-Type'=>'text/csv; charset=UTF-8']);
+        $out=fopen('php://temp','w+'); fwrite($out,"\xEF\xBB\xBF"); fputcsv($out,array_values($config['columns']),';'); foreach($rows as $row) fputcsv($out,array_map(fn($key)=>$row->{$key}??'',array_keys($config['columns'])),';'); rewind($out); $contents=stream_get_contents($out); fclose($out);
+        $filename=$module.'-'.now()->format('Y-m-d-His').'.csv'; $path=$this->storage->putExport($filename,$contents);
+        return $this->storage->download($path,$filename);
     }
 }
