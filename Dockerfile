@@ -7,8 +7,14 @@
 #   phpoffice/phpspreadsheet 5.9.0 requires ext-gd * -> it is missing
 #
 # This Dockerfile extends the official FrankenPHP image, compiles and
-# enables gd, then runs the normal composer/npm build for the app.
-FROM dunglas/frankenphp:php8.3
+# enables gd, copies the composer binary from the official composer image,
+# then runs the normal composer/npm build for the app.
+
+# --- Stage 1: composer binary -----------------------------------------------
+FROM composer:2 AS composer
+
+# --- Stage 2: application base ----------------------------------------------
+FROM dunglas/frankenphp:php8.3 AS base
 
 # --- PHP gd extension -------------------------------------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -23,6 +29,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         --with-webp \
     && docker-php-ext-install -j"$(nproc)" gd pdo_sqlite \
     && rm -rf /var/lib/apt/lists/*
+
+# --- Composer ----------------------------------------------------------------
+COPY --from=composer /usr/bin/composer /usr/bin/composer
 
 # --- Node.js (required to build the frontend assets) -----------------------
 RUN apt-get update && apt-get install -y --no-install-recommends curl gnupg \
