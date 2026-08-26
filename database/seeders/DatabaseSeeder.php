@@ -86,9 +86,9 @@ class DatabaseSeeder extends Seeder
             foreach($orderItems as $item) DB::table('order_items')->updateOrInsert(['order_id'=>$item['order_id'],'name'=>$item['name']],$item);
 
             $invoices=[
-                ['number'=>'FA-MI-2026-001','order_id'=>$orderIds['MI-2026-001'],'client_id'=>$clientIds['CLI-2026-001'],'type'=>'produits','status'=>'partielle','issued_at'=>$now->copy()->subDays(15)->toDateString(),'subtotal'=>5000000,'paid_amount'=>4000000,'balance_due'=>1000000,'lines'=>json_encode([['label'=>'20 chaises restaurant','amount'=>5000000]])],
-                ['number'=>'FF-MI-2026-001','order_id'=>$orderIds['MI-2026-001'],'client_id'=>$clientIds['CLI-2026-001'],'type'=>'frais','status'=>'provisoire','issued_at'=>$now->copy()->subDays(15)->toDateString(),'subtotal'=>1750000,'paid_amount'=>0,'balance_due'=>1750000,'lines'=>json_encode([['label'=>'Fret et commission','amount'=>1750000]])],
-                ['number'=>'FA-MI-2026-002','order_id'=>$orderIds['MI-2026-002'],'client_id'=>$clientIds['CLI-2026-002'],'type'=>'produits','status'=>'partielle','issued_at'=>$now->copy()->subDays(9)->toDateString(),'subtotal'=>6720000,'paid_amount'=>3000000,'balance_due'=>3720000,'lines'=>json_encode([['label'=>'40 caméras Wi-Fi','amount'=>6720000]])],
+                ['number'=>'FA-MI-2026-001','order_id'=>$orderIds['MI-2026-001'],'client_id'=>$clientIds['CLI-2026-001'],'type'=>'produits','status'=>'partielle','issued_at'=>$now->copy()->subDays(15)->toDateString(),'subtotal'=>5000000,'paid_amount'=>4000000,'balance_due'=>1000000,'lines'=>json_encode([['label'=>'20 chaises restaurant','quantity'=>20,'unit_price'=>250000,'amount'=>5000000]])],
+                ['number'=>'FF-MI-2026-001','order_id'=>$orderIds['MI-2026-001'],'client_id'=>$clientIds['CLI-2026-001'],'type'=>'frais','status'=>'provisoire','issued_at'=>$now->copy()->subDays(15)->toDateString(),'subtotal'=>1750000,'paid_amount'=>0,'balance_due'=>1750000,'lines'=>json_encode([['label'=>'Fret et commission','quantity'=>1,'unit_price'=>1750000,'amount'=>1750000]])],
+                ['number'=>'FA-MI-2026-002','order_id'=>$orderIds['MI-2026-002'],'client_id'=>$clientIds['CLI-2026-002'],'type'=>'produits','status'=>'partielle','issued_at'=>$now->copy()->subDays(9)->toDateString(),'subtotal'=>6720000,'paid_amount'=>3000000,'balance_due'=>3720000,'lines'=>json_encode([['label'=>'40 caméras Wi-Fi','quantity'=>40,'unit_price'=>168000,'amount'=>6720000]])],
             ];
             foreach($invoices as &$invoice){$invoice['created_at']=$now;$invoice['updated_at']=$now;}
             unset($invoice);
@@ -141,5 +141,7 @@ class DatabaseSeeder extends Seeder
                 DB::table('number_sequences')->updateOrInsert(['type'=>$type,'year'=>2026],['last_number'=>$lastNumber,'created_at'=>$now,'updated_at'=>$now]);
             }
         });
+
+        $this->call(DemoDataSeeder::class);
     }
 }

@@ -22,6 +22,12 @@ La base SQLite incluse contient des exemples de clients, fournisseurs, produits,
 
 La base incluse est destinée aux tests client. Avant une mise en production, repartir d’une base vide, remplacer le mot de passe de démonstration, configurer HTTPS, `APP_ENV=production`, `APP_DEBUG=false`, les sauvegardes SQLite et le stockage privé des pièces jointes.
 
+### Laravel Cloud et conservation des données
+
+SQLite doit rester réservé au développement local : le système de fichiers des instances Laravel Cloud est éphémère. En production Cloud, attacher une base Laravel MySQL ou Serverless Postgres à l’environnement avant le premier déploiement. Laravel Cloud injectera alors les variables `DB_*` nécessaires.
+
+La commande de déploiement doit utiliser uniquement `php artisan migrate --force`. Ne jamais exécuter `migrate:fresh`, `db:wipe` ou `db:seed` automatiquement en production. Les migrations normales conservent les enregistrements existants. Les fichiers téléversés doivent être placés dans Laravel Object Storage plutôt que sur le disque local de l’instance.
+
 ## Architecture de données
 
 La migration métier couvre les séquences annuelles atomiques, clients, fournisseurs et catalogue, devis et lignes, commandes et lignes, factures, paiements clients, paiements fournisseurs multi-commandes, expéditions, stock et mouvements, inventaires mensuels, ventes locales, dépenses, employés, salaires, fiscalité, documents privés et journal d’audit. Tous les montants utilisent `DECIMAL`.

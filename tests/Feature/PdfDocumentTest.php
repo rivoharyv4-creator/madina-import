@@ -45,6 +45,28 @@ class PdfDocumentTest extends TestCase
         $this->assertStringStartsWith('%PDF',Storage::disk('persistent')->get('invoices/FA-MI-2026-001.pdf'));
     }
 
+    public function test_client_document_displays_unit_prices_without_revealing_margin(): void
+    {
+        $document=DB::table('quotes')
+            ->join('clients','clients.id','=','quotes.client_id')
+            ->where('quotes.number','DV-MI-2026-001')
+            ->select('quotes.*','clients.number as client_number','clients.name as client_name','quotes.contact as client_contact','clients.address as client_address')
+            ->first();
+        $items=DB::table('quote_items')->where('quote_id',$document->id)->get()->each(fn($item)=>$item->photo_data=null);
+        $module='devis'; $title='DEVIS'; $logoData=null; $company=config('madina.company');
+
+        $html=view('pdf.document',compact('module','document','items','title','logoData','company'))->render();
+
+        $this->assertStringContainsString('Prix unitaire',$html);
+        $this->assertStringContainsString('Ambatomainty Lot 102 B Bis Antananarivo',$html);
+        $this->assertStringContainsString('+261 34 98 732 08',$html);
+        $this->assertStringContainsString('+86 158 0200 3702',$html);
+        $this->assertStringContainsString('contactmadinaimport@gmail.com',$html);
+        $this->assertStringNotContainsString('Prix total sans marge',$html);
+        $this->assertStringNotContainsString('>Marge<',$html);
+        $this->assertStringNotContainsString('Fournisseur :',$html);
+    }
+
     public function test_pdf_download_requires_authentication(): void
     {
         $quoteId=DB::table('quotes')->value('id');

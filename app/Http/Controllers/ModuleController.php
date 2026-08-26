@@ -47,14 +47,21 @@ class ModuleController extends Controller
 
     public function index(Request $request, string $module)
     {
-        $config=$this->config($module); $rows=[];
+        $config=$this->config($module); $rows=[]; $pagination=['current_page'=>1,'last_page'=>1,'per_page'=>20,'total'=>0,'from'=>null,'to'=>null];
+        $filterDefinitions=$this->filterDefinitions($module);
+        $activeFilters=collect($filterDefinitions)->mapWithKeys(fn($label,$field)=>[$field=>$request->string('filter_'.$field)->toString()])->filter(fn($value)=>$value!=='')->all();
+        $filterOptions=[];
         if (DB::getSchemaBuilder()->hasTable($config['table'])) {
-            $q=DB::table($config['table'])->orderByDesc('id');
-            if(DB::getSchemaBuilder()->hasColumn($config['table'],'deleted_at')) $q->whereNull('deleted_at');
-            if ($request->filled('q')) $q->where(function($query) use($request,$config){ foreach(array_keys($config['columns']) as $column) if(!str_contains($column,'_id')) $query->orWhere($column,'like','%'.$request->q.'%'); });
-            $rows=$this->decorate($q->limit(50)->get()->map(fn($row)=>(array)$row)->all());
+            $q=$this->exportQuery($config,$request->string('q')->toString(),$activeFilters);
+            $page=$q->paginate(20)->withQueryString();
+            $rows=$this->decorate(collect($page->items())->map(fn($row)=>(array)$row)->all());
+            $pagination=['current_page'=>$page->currentPage(),'last_page'=>$page->lastPage(),'per_page'=>$page->perPage(),'total'=>$page->total(),'from'=>$page->firstItem(),'to'=>$page->lastItem()];
+            foreach($filterDefinitions as $field=>$label){
+                $values=DB::table($config['table'])->whereNotNull($field)->distinct()->orderBy($field)->pluck($field)->map(fn($value)=>['value'=>(string)$value,'label'=>$field==='active'?((bool)$value?'Actif':'Inactif'):ucfirst(str_replace('_',' ',(string)$value))])->values()->all();
+                $filterOptions[]=['field'=>$field,'label'=>$label,'options'=>$values];
+            }
         }
-        return Inertia::render('Module/Index',['module'=>$module,'config'=>$config,'rows'=>$rows,'query'=>$request->q,'flash'=>session('success')]);
+        return Inertia::render('Module/Index',['module'=>$module,'config'=>$config,'rows'=>$rows,'pagination'=>$pagination,'query'=>$request->q,'filterOptions'=>$filterOptions,'activeFilters'=>$activeFilters,'flash'=>session('success')]);
     }
 
     public function create(Request $request, string $module)
@@ -103,7 +110,7 @@ class ModuleController extends Controller
             return [...(array)$package,'items'=>$contents];
         })->values();
 
-        return Inertia::render('Module/OrderShow',['order'=>$order,'items'=>$items,'packages'=>$packages]);
+        return Inertia::render('Module/OrderShow',['order'=>$order,'items'=>$items,'packages'=>$packages,'company'=>config('madina.company')]);
     }
 
     public function pdf(string $module, int $id)
@@ -132,7 +139,7 @@ class ModuleController extends Controller
                 ->first();
             abort_unless($document,404);
             $items=collect(json_decode($document->lines??'[]',false)?:[]);
-            $document->products=DB::table('order_items')->where('order_id',$document->order_id)->orderBy('id')->get(['name','specifications','quantity']);
+            $document->products=DB::table('order_items')->where('order_id',$document->order_id)->orderBy('id')->get(['name','specifications','quantity','client_total']);
             $title='FACTURE';
             $directory='invoices';
         }
@@ -294,7 +301,17 @@ class ModuleController extends Controller
     private function createInvoice(array $data, NumberSequenceService $numbers): int
     {
         $order=DB::table('orders')->find($data['order_id']); $paid=(float)($data['paid_amount']??0); $subtotal=(float)$data['subtotal']; if($paid>$subtotal) throw ValidationException::withMessages(['paid_amount'=>'Le montant reçu ne peut pas dépasser le total.']);
-        return DB::table('invoices')->insertGetId(['number'=>$numbers->next($data['type']==='frais'?'fee_invoice':'invoice'),'order_id'=>$order->id,'client_id'=>$order->client_id,'type'=>$data['type'],'status'=>$paid>0&&$paid<$subtotal?'partielle':$data['status'],'issued_at'=>$data['issued_at'],'subtotal'=>$subtotal,'paid_amount'=>$paid,'balance_due'=>$subtotal-$paid,'lines'=>json_encode([['label'=>$data['type']==='frais'?'Frais de commande':'Produits commandés','amount'=>$subtotal]]),'created_at'=>now(),'updated_at'=>now()]);
+        $orderItems=DB::table('order_items')->where('order_id',$order->id)->orderBy('id')->get();
+        $orderItemsTotal=(float)$orderItems->sum('client_total');
+        $factor=$orderItemsTotal>0?$subtotal/$orderItemsTotal:1;
+        $lines=$data['type']==='produits'
+            ? $orderItems->map(function($item) use($factor){
+                $quantity=(float)$item->quantity;
+                $amount=(float)$item->client_total*$factor;
+                return ['label'=>$item->name,'quantity'=>$quantity,'unit_price'=>$quantity>0?$amount/$quantity:0,'amount'=>$amount];
+            })->values()->all()
+            : [['label'=>'Frais de commande','quantity'=>1,'unit_price'=>$subtotal,'amount'=>$subtotal]];
+        return DB::table('invoices')->insertGetId(['number'=>$numbers->next($data['type']==='frais'?'fee_invoice':'invoice'),'order_id'=>$order->id,'client_id'=>$order->client_id,'type'=>$data['type'],'status'=>$paid>0&&$paid<$subtotal?'partielle':$data['status'],'issued_at'=>$data['issued_at'],'subtotal'=>$subtotal,'paid_amount'=>$paid,'balance_due'=>$subtotal-$paid,'lines'=>json_encode($lines),'created_at'=>now(),'updated_at'=>now()]);
     }
 
     private function createSupplierPayment(array $data): int
@@ -442,7 +459,7 @@ class ModuleController extends Controller
     private function orderProducts(string $module): array
     {
         if(!in_array($module,['factures','logistique'],true)) return [];
-        return DB::table('order_items')->orderBy('id')->get()->groupBy('order_id')->map(fn($items)=>$items->map(fn($item)=>['name'=>$item->name,'specifications'=>$item->specifications,'quantity'=>$item->quantity,'photo_url'=>$item->photo_path?'/product-photo/'.basename($item->photo_path):null])->values()->all())->all();
+        return DB::table('order_items')->orderBy('id')->get()->groupBy('order_id')->map(fn($items)=>$items->map(fn($item)=>['name'=>$item->name,'specifications'=>$item->specifications,'quantity'=>$item->quantity,'client_total'=>$item->client_total,'unit_price'=>(float)$item->quantity>0?(float)$item->client_total/(float)$item->quantity:0,'photo_url'=>$item->photo_path?'/product-photo/'.basename($item->photo_path):null])->values()->all())->all();
     }
 
     private function orderTemplates(string $module): array
@@ -476,14 +493,47 @@ class ModuleController extends Controller
         return DB::table('supplier_products')->where('supplier_id',$id)->orderBy('id')->get()->map(fn($product)=>[...(array)$product,'photo'=>null,'photo_url'=>$product->photo_path?'/product-photo/'.basename($product->photo_path):null])->all();
     }
 
-    public function export(string $module)
+    public function export(Request $request, string $module)
     {
         $config=$this->config($module); abort_unless(DB::getSchemaBuilder()->hasTable($config['table']),404);
-        $query=DB::table($config['table'])->orderByDesc('id');
-        if(DB::getSchemaBuilder()->hasColumn($config['table'],'deleted_at')) $query->whereNull('deleted_at');
+        $activeFilters=collect($this->filterDefinitions($module))->mapWithKeys(fn($label,$field)=>[$field=>$request->string('filter_'.$field)->toString()])->filter(fn($value)=>$value!=='')->all();
+        $query=$this->exportQuery($config,$request->string('q')->toString(),$activeFilters);
         $rows=$this->decorate($query->get()->map(fn($row)=>(array)$row)->all());
         $contents=Excel::raw(new StyledModuleExport($module,$config['title'],$config['columns'],$rows),ExcelFormat::XLSX);
         $filename=$module.'-'.now()->format('Y-m-d-His').'.xlsx'; $path=$this->storage->putExport($filename,$contents);
         return $this->storage->download($path,$filename);
     }
+
+    private function exportQuery(array $config, string $search='', array $filters=[])
+    {
+        $query=DB::table($config['table'])->orderByDesc($config['table'].'.id');
+        if(DB::getSchemaBuilder()->hasColumn($config['table'],'deleted_at')) $query->whereNull($config['table'].'.deleted_at');
+        if($search!=='') $query->where(function($nested) use($search,$config){
+            foreach(array_keys($config['columns']) as $column) if(!str_contains($column,'_id')) $nested->orWhere($column,'like','%'.$search.'%');
+        });
+        foreach($filters as $field=>$value) $query->where($config['table'].'.'.$field,$value);
+        return $query;
+    }
+
+    private function filterDefinitions(string $module): array
+    {
+        return match($module){
+            'clients'=>['active'=>'Statut'],
+            'devis'=>['status'=>'Statut'],
+            'commandes'=>['status'=>'Statut'],
+            'paiements'=>['type'=>'Type','status'=>'Statut'],
+            'factures'=>['type'=>'Type','status'=>'Statut'],
+            'fournisseurs'=>['active'=>'Statut'],
+            'achats'=>['method'=>'Mode','status'=>'Statut'],
+            'logistique'=>['mode'=>'Mode','status'=>'Statut'],
+            'ventes'=>['status'=>'Statut','payment_method'=>'Paiement'],
+            'depenses'=>['category'=>'Catégorie','type'=>'Type'],
+            'salaires'=>['status'=>'Statut'],
+            'employes'=>['active'=>'Statut'],
+            'fiscalite'=>['type'=>'Type','status'=>'Statut'],
+            'rapports'=>['event'=>'Opération'],
+            default=>[],
+        };
+    }
+
 }

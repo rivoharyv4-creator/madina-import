@@ -42,7 +42,7 @@
     <table class="header">
         <tr>
             <td style="width:110px">@if($logoData)<img class="logo" src="{{ $logoData }}" alt="Madina Import">@endif</td>
-            <td><div class="brand">{{ $company['name'] }}</div><div class="tagline">{{ $company['email'] }} · {{ $company['contact'] }}<br>{{ $company['address'] }}</div></td>
+            <td><div class="brand">{{ $company['name'] }}</div><div class="tagline">{{ $company['address'] }}<br>Tél. : {{ $company['contact'] }} · WhatsApp : {{ $company['whatsapp'] }}<br>{{ $company['email'] }}</div></td>
             <td><div class="document-title">{{ $title }}</div><div class="number">N° {{ $document->number }}</div></td>
         </tr>
     </table>
@@ -55,13 +55,17 @@
     </table>
 
     <table class="lines">
-        <thead><tr><th>Désignation</th>@if($module==='devis')<th class="qty">Quantité</th>@endif<th class="amount">Montant</th></tr></thead>
+        <thead><tr><th>Désignation</th><th class="qty">Quantité</th><th class="amount">Prix unitaire</th><th class="amount">Montant</th></tr></thead>
         <tbody>
         @foreach($items as $item)
             <tr>
-                <td>@if($module==='devis' && $item->photo_data)<img class="product-photo" src="{{ $item->photo_data }}" alt="">@endif<strong>{{ $module==='devis'?$item->name:$item->label }}</strong>@if($module==='devis' && $item->specifications)<div class="description">{{ $item->specifications }}</div>@endif @if($module==='devis' && $item->supplier_name)<div class="description">Fournisseur : {{ $item->supplier_name }}@if($item->supplier_contact) · {{ $item->supplier_contact }}@endif</div>@endif</td>
-                @if($module==='devis')<td class="qty">{{ rtrim(rtrim(number_format((float)$item->quantity,3,',',' '),'0'),',') }}</td>@endif
-                <td class="amount">{{ number_format((float)($module==='devis'?$item->total:$item->amount),0,',','.') }} Ar</td>
+                <td>@if($module==='devis' && $item->photo_data)<img class="product-photo" src="{{ $item->photo_data }}" alt="">@endif<strong>{{ $module==='devis'?$item->name:$item->label }}</strong>@if($module==='devis' && $item->specifications)<div class="description">{{ $item->specifications }}</div>@endif</td>
+                @php($quantity=(float)($item->quantity??1))
+                @php($amount=(float)($module==='devis'?$item->total:$item->amount))
+                @php($unitPrice=isset($item->unit_price)?(float)$item->unit_price:($quantity>0?$amount/$quantity:0))
+                <td class="qty">{{ rtrim(rtrim(number_format($quantity,3,',',' '),'0'),',') }}</td>
+                <td class="amount">{{ number_format($unitPrice,0,',','.') }} Ar</td>
+                <td class="amount">{{ number_format($amount,0,',','.') }} Ar</td>
             </tr>
         @endforeach
         </tbody>
@@ -72,7 +76,7 @@
     @endif
 
     <table class="totals">
-        @if($module==='devis')<tr><td>Prix total sans marge</td><td class="value">{{ number_format(max(0,(float)$document->total-(float)$document->margin),0,',','.') }} Ar</td></tr><tr><td>Marge</td><td class="value">{{ number_format((float)$document->margin,0,',','.') }} Ar</td></tr>@else<tr><td>Déjà payé</td><td class="value">{{ number_format((float)$document->paid_amount,0,',','.') }} Ar</td></tr><tr><td>Reste à payer</td><td class="value">{{ number_format((float)$document->balance_due,0,',','.') }} Ar</td></tr>@endif
+        @if($module==='factures')<tr><td>Déjà payé</td><td class="value">{{ number_format((float)$document->paid_amount,0,',','.') }} Ar</td></tr><tr><td>Reste à payer</td><td class="value">{{ number_format((float)$document->balance_due,0,',','.') }} Ar</td></tr>@endif
         <tr class="grand"><td>Total</td><td class="value">{{ number_format((float)($module==='devis'?$document->total:$document->subtotal),0,',','.') }} Ar</td></tr>
     </table>
 

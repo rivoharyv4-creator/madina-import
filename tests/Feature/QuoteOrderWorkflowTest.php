@@ -111,5 +111,9 @@ class QuoteOrderWorkflowTest extends TestCase
         ])->assertRedirect('/modules/factures');
 
         $this->assertDatabaseHas('invoices',['order_id'=>$order->id,'client_id'=>$order->client_id,'subtotal'=>$order->client_total,'paid_amount'=>$order->deposit]);
+        $invoice=DB::table('invoices')->where('order_id',$order->id)->latest('id')->first();
+        $line=collect(json_decode($invoice->lines,true))->first();
+        $this->assertArrayHasKey('quantity',$line);
+        $this->assertArrayHasKey('unit_price',$line);
     }
 }
