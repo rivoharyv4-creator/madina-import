@@ -11,6 +11,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -27,7 +28,7 @@ class ModuleController extends Controller
     {
         return [
             'clients'=>['title'=>'Clients','table'=>'clients','primary'=>'Nouveau client','editable'=>true,'columns'=>['number'=>'N° client','name'=>'Client','contact'=>'Contact','type'=>'Type','active'=>'Statut']],
-            'devis'=>['title'=>'Devis','table'=>'quotes','primary'=>'Nouveau devis','editable'=>true,'columns'=>['number'=>'N° devis','quote_date'=>'Date du devis','client_id'=>'Client','total'=>'Montant','valid_until'=>'Validité','status'=>'Statut']],
+            'devis'=>['title'=>'Devis','table'=>'quotes','primary'=>'Nouveau devis','editable'=>true,'columns'=>['number'=>'N° devis','created_at'=>'Date du devis','client_id'=>'Client','total'=>'Montant','valid_until'=>'Validité','status'=>'Statut']],
             'commandes'=>['title'=>'Commandes','table'=>'orders','primary'=>'Nouvelle commande','editable'=>true,'columns'=>['number'=>'N° commande','client_id'=>'Client','client_total'=>'Total client','ordered_at'=>'Date','status'=>'Statut']],
             'paiements'=>['title'=>'Paiements clients','table'=>'client_payments','primary'=>'Nouveau paiement','editable'=>true,'columns'=>['client_id'=>'Client','paid_at'=>'Date','amount'=>'Montant','method'=>'Mode','status'=>'Statut']],
             'factures'=>['title'=>'Factures','table'=>'invoices','primary'=>'Nouvelle facture','editable'=>true,'columns'=>['number'=>'N° facture','type'=>'Type','subtotal'=>'Total','issued_at'=>'Date','status'=>'Statut']],
@@ -55,6 +56,7 @@ class ModuleController extends Controller
             $q=$this->exportQuery($config,$request->string('q')->toString(),$activeFilters);
             $page=$q->paginate(20)->withQueryString();
             $rows=$this->decorate(collect($page->items())->map(fn($row)=>(array)$row)->all());
+            if($module==='devis') $rows=array_map(fn($row)=>[...$row,'created_at'=>$this->chinaDate($row['created_at'])],$rows);
             $pagination=['current_page'=>$page->currentPage(),'last_page'=>$page->lastPage(),'per_page'=>$page->perPage(),'total'=>$page->total(),'from'=>$page->firstItem(),'to'=>$page->lastItem()];
             foreach($filterDefinitions as $field=>$label){
                 $values=DB::table($config['table'])->whereNotNull($field)->distinct()->orderBy($field)->pluck($field)->map(fn($value)=>['value'=>(string)$value,'label'=>$field==='active'?((bool)$value?'Actif':'Inactif'):ucfirst(str_replace('_',' ',(string)$value))])->values()->all();
@@ -77,7 +79,7 @@ class ModuleController extends Controller
         $config=$this->config($module); abort_unless($config['editable']??false,404); $query=DB::table($config['table']); if(DB::getSchemaBuilder()->hasColumn($config['table'],'deleted_at')) $query->whereNull('deleted_at'); $record=$query->find($id); abort_unless($record,404);
         $values=$this->editValues($module,$record);
         $fields=array_map(function($field) use($values){ if(array_key_exists($field['name'],$values)) $field['default']=$values[$field['name']]; if($field['type']==='file'&&!empty($values['photo_path'])) $field['preview']='/product-photo/'.basename($values['photo_path']); if($field['name']==='proof'&&!empty($values['proof_path'])) $field['preview']='/purchase-proof/'.basename($values['proof_path']); return $field; },$this->fields($module));
-        return Inertia::render('Module/Form',['module'=>$module,'config'=>[...$config,'primary'=>'Modifier '.$config['title']],'fields'=>$fields,'recordId'=>$id,'prefill'=>$module==='devis'?['quote_date'=>$record->quote_date?:substr($record->created_at,0,10)]:[],'itemFields'=>$this->itemFields($module),'initialItems'=>$this->existingItems($module,$id),'initialPackages'=>$this->existingPackages($module,$id),'initialSupplierProducts'=>$this->supplierProducts($module,$id),'orderProducts'=>$this->orderProducts($module),'orderTemplates'=>$this->orderTemplates($module),'quoteTemplates'=>$this->quoteTemplates($module),'company'=>config('madina.company')]);
+        return Inertia::render('Module/Form',['module'=>$module,'config'=>[...$config,'primary'=>'Modifier '.$config['title']],'fields'=>$fields,'recordId'=>$id,'prefill'=>$module==='devis'?['quote_date'=>$this->chinaDate($record->created_at)]:[],'itemFields'=>$this->itemFields($module),'initialItems'=>$this->existingItems($module,$id),'initialPackages'=>$this->existingPackages($module,$id),'initialSupplierProducts'=>$this->supplierProducts($module,$id),'orderProducts'=>$this->orderProducts($module),'orderTemplates'=>$this->orderTemplates($module),'quoteTemplates'=>$this->quoteTemplates($module),'company'=>config('madina.company')]);
     }
 
     public function show(string $module, int $id)
@@ -228,7 +230,7 @@ class ModuleController extends Controller
     {
         if(empty($data['client_id'])) $data['client_id']=DB::table('clients')->insertGetId(['number'=>$numbers->next('client'),'name'=>$data['client_name'],'contact'=>$data['client_contact'],'type'=>$data['client_type'],'address'=>null,'notes'=>'Créé directement depuis un devis','active'=>true,'credit_balance'=>0,'created_at'=>now(),'updated_at'=>now()]);
         $client=DB::table('clients')->find($data['client_id']); $supplierTotal=collect($data['items'])->sum(fn($item)=>(float)$item['supplier_price']*(float)$item['quantity']); $logistics=collect($data['items'])->sum(fn($item)=>(float)($item['china_delivery']??0)+(float)($item['packaging']??0)+(float)($item['freight']??0)); $margin=collect($data['items'])->sum(fn($item)=>(float)($item['margin']??0)); $total=collect($data['items'])->sum(fn($item)=>(float)$item['total']);
-        $id=DB::table('quotes')->insertGetId(['number'=>$numbers->next('quote'),'client_id'=>$client->id,'client_name'=>$data['client_name'],'contact'=>$data['client_contact'],'client_type'=>$client->type,'quote_date'=>$this->quoteDate(),'sent_at'=>$data['status']==='brouillon'?null:today(),'valid_until'=>$data['valid_until'],'shipping_mode'=>$data['shipping_mode'],'shipping_delay'=>$data['shipping_delay']??null,'bank_details'=>$data['bank_details']??null,'payment_terms'=>$data['payment_terms']??null,'warranty'=>$data['warranty']??null,'status'=>$data['status'],'supplier_estimate'=>$supplierTotal,'logistics_estimate'=>$logistics,'margin'=>$margin,'total'=>$total,'currency'=>'MGA','notes'=>$data['notes']??null,'created_at'=>now(),'updated_at'=>now()]);
+        $id=DB::table('quotes')->insertGetId(['number'=>$numbers->next('quote'),'client_id'=>$client->id,'client_name'=>$data['client_name'],'contact'=>$data['client_contact'],'client_type'=>$client->type,'sent_at'=>$data['status']==='brouillon'?null:today(),'valid_until'=>$data['valid_until'],'shipping_mode'=>$data['shipping_mode'],'shipping_delay'=>$data['shipping_delay']??null,'bank_details'=>$data['bank_details']??null,'payment_terms'=>$data['payment_terms']??null,'warranty'=>$data['warranty']??null,'status'=>$data['status'],'supplier_estimate'=>$supplierTotal,'logistics_estimate'=>$logistics,'margin'=>$margin,'total'=>$total,'currency'=>'MGA','notes'=>$data['notes']??null,'created_at'=>now(),'updated_at'=>now()]);
         $this->insertQuoteItems($id,$data['items']);
         return $id;
     }
@@ -358,7 +360,7 @@ class ModuleController extends Controller
         if($module==='stock') { $photo=$data['photo']??null; unset($data['photo']); $before=(float)$old->quantity; $after=(float)$data['quantity']; DB::table('inventory_products')->where('id',$id)->update([...$data,'photo_path'=>$photo?$this->storePhoto($photo):$old->photo_path,'stock_value'=>$after*(float)$data['purchase_price'],'entered_at'=>$after>$before?today():$old->entered_at,'exited_at'=>$after<$before?today():$old->exited_at,'updated_at'=>now()]); if($after!==$before) DB::table('stock_movements')->insert(['inventory_product_id'=>$id,'type'=>'inventaire','quantity'=>abs($after-$before),'before_quantity'=>$before,'after_quantity'=>$after,'notes'=>'Correction manuelle auditée','moved_at'=>now(),'user_id'=>$userId]); return; }
         if($module==='devis') {
             $client=DB::table('clients')->find($data['client_id']); $supplierTotal=collect($data['items'])->sum(fn($item)=>(float)$item['supplier_price']*(float)$item['quantity']); $logistics=collect($data['items'])->sum(fn($item)=>(float)($item['china_delivery']??0)+(float)($item['packaging']??0)+(float)($item['freight']??0)); $margin=collect($data['items'])->sum(fn($item)=>(float)($item['margin']??0)); $total=collect($data['items'])->sum(fn($item)=>(float)$item['total']);
-            DB::table('quotes')->where('id',$id)->update(['client_id'=>$client->id,'client_name'=>$data['client_name'],'contact'=>$data['client_contact'],'client_type'=>$client->type,'quote_date'=>$old->quote_date??substr($old->created_at,0,10),'sent_at'=>$data['status']==='brouillon'?null:($old->sent_at??today()),'valid_until'=>$data['valid_until'],'shipping_mode'=>$data['shipping_mode'],'shipping_delay'=>$data['shipping_delay']??null,'bank_details'=>$data['bank_details']??null,'payment_terms'=>$data['payment_terms']??null,'warranty'=>$data['warranty']??null,'notes'=>$data['notes']??null,'status'=>$data['status'],'supplier_estimate'=>$supplierTotal,'logistics_estimate'=>$logistics,'margin'=>$margin,'total'=>$total,'updated_at'=>now()]);
+            DB::table('quotes')->where('id',$id)->update(['client_id'=>$client->id,'client_name'=>$data['client_name'],'contact'=>$data['client_contact'],'client_type'=>$client->type,'sent_at'=>$data['status']==='brouillon'?null:($old->sent_at??today()),'valid_until'=>$data['valid_until'],'shipping_mode'=>$data['shipping_mode'],'shipping_delay'=>$data['shipping_delay']??null,'bank_details'=>$data['bank_details']??null,'payment_terms'=>$data['payment_terms']??null,'warranty'=>$data['warranty']??null,'notes'=>$data['notes']??null,'status'=>$data['status'],'supplier_estimate'=>$supplierTotal,'logistics_estimate'=>$logistics,'margin'=>$margin,'total'=>$total,'updated_at'=>now()]);
             $photos=DB::table('quote_items')->where('quote_id',$id)->pluck('photo_path','id')->all(); DB::table('quote_items')->where('quote_id',$id)->delete(); $this->insertQuoteItems($id,$data['items'],$photos); return;
         }
         if($module==='commandes') {
@@ -500,6 +502,7 @@ class ModuleController extends Controller
         $activeFilters=collect($this->filterDefinitions($module))->mapWithKeys(fn($label,$field)=>[$field=>$request->string('filter_'.$field)->toString()])->filter(fn($value)=>$value!=='')->all();
         $query=$this->exportQuery($config,$request->string('q')->toString(),$activeFilters);
         $rows=$this->decorate($query->get()->map(fn($row)=>(array)$row)->all());
+        if($module==='devis') $rows=array_map(fn($row)=>[...$row,'created_at'=>$this->chinaDate($row['created_at'])],$rows);
         $columns=$config['columns'];
         if($module==='devis') [$columns,$rows]=$this->quoteExportData($rows);
         $contents=Excel::raw(new StyledModuleExport($module,$config['title'],$columns,$rows),ExcelFormat::XLSX);
@@ -509,7 +512,7 @@ class ModuleController extends Controller
 
     private function quoteExportData(array $quotes): array
     {
-        $columns=['number'=>'N° devis','quote_date'=>'Date du devis','client_id'=>'Client','product_name'=>'Produit','photo_path'=>'Photo','quantity'=>'Quantité','product_total'=>'Total produit','valid_until'=>'Valide jusqu’au','status'=>'Statut'];
+        $columns=['number'=>'N° devis','created_at'=>'Date du devis','client_id'=>'Client','product_name'=>'Produit','photo_path'=>'Photo','quantity'=>'Quantité','product_total'=>'Total produit','valid_until'=>'Valide jusqu’au','status'=>'Statut'];
         $items=DB::table('quote_items')->whereIn('quote_id',array_column($quotes,'id'))->orderBy('id')->get()->groupBy('quote_id');
         $rows=[];
         foreach($quotes as $quote){
@@ -523,6 +526,11 @@ class ModuleController extends Controller
     private function quoteDate(): string
     {
         return now(config('madina.company.timezone','Asia/Shanghai'))->toDateString();
+    }
+
+    private function chinaDate(string $date): string
+    {
+        return Carbon::parse($date,config('app.timezone'))->timezone(config('madina.company.timezone','Asia/Shanghai'))->toDateString();
     }
 
     private function exportQuery(array $config, string $search='', array $filters=[])

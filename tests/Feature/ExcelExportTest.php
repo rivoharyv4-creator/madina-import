@@ -89,7 +89,7 @@ class ExcelExportTest extends TestCase
         $quote=DB::table('quotes')->where('number','DV-MI-2026-001')->first();
         $photo='products/quote-product.png';
         Storage::disk('persistent')->put($photo,base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='));
-        DB::table('quotes')->where('id',$quote->id)->update(['quote_date'=>'2026-08-20']);
+        DB::table('quotes')->where('id',$quote->id)->update(['created_at'=>'2026-08-20 12:00:00']);
         DB::table('quote_items')->where('quote_id',$quote->id)->update(['photo_path'=>$photo]);
 
         $this->actingAs($manager)->get('/modules/devis/export?q=DV-MI-2026-001')->assertOk();

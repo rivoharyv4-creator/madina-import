@@ -39,7 +39,7 @@ class QuoteOrderWorkflowTest extends TestCase
 
         $quote=DB::table('quotes')->where('client_name','Nom personnalisé')->first();
         $this->assertSame('relance_1',$quote->status);
-        $this->assertSame('2026-08-28',$quote->quote_date);
+        $this->assertSame('2026-08-28',Carbon::parse($quote->created_at,config('app.timezone'))->timezone(config('madina.company.timezone'))->toDateString());
         $this->assertSame('maritime',$quote->shipping_mode);
         $this->assertSame('BOA 00001',$quote->bank_details);
         $item=DB::table('quote_items')->where('quote_id',$quote->id)->first();
