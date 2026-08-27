@@ -6,6 +6,7 @@ use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -27,15 +28,18 @@ class QuoteOrderWorkflowTest extends TestCase
 
     public function test_quote_stores_custom_client_supplier_shipping_terms_status_and_photo(): void
     {
+        $this->travelTo(Carbon::parse('2026-08-27 17:30:00','UTC'));
         $client=DB::table('clients')->first();
+        $this->actingAs($this->manager)->get('/modules/devis/create')->assertInertia(fn(Assert $page)=>$page->where('prefill.quote_date','2026-08-28'));
         $this->actingAs($this->manager)->post('/modules/devis',[
-            'client_id'=>$client->id,'client_name'=>'Nom personnalisé','client_contact'=>'+261 34 99 999 99','valid_until'=>'2026-10-30','shipping_mode'=>'maritime','shipping_delay'=>'45 à 60 jours','bank_details'=>'BOA 00001','payment_terms'=>'50 % commande, 50 % livraison','warranty'=>'12 mois','notes'=>'Couleur à confirmer','status'=>'relance_1','items'=>[[
+            'client_id'=>$client->id,'client_name'=>'Nom personnalisé','client_contact'=>'+261 34 99 999 99','quote_date'=>'2020-01-01','valid_until'=>'2026-10-30','shipping_mode'=>'maritime','shipping_delay'=>'45 à 60 jours','bank_details'=>'BOA 00001','payment_terms'=>'50 % commande, 50 % livraison','warranty'=>'12 mois','notes'=>'Couleur à confirmer','status'=>'relance_1','items'=>[[
                 'name'=>'Table sur mesure','photo'=>UploadedFile::fake()->image('table.jpg'),'quantity'=>2,'supplier_name'=>'Atelier manuel','supplier_contact'=>'WeChat atelier-88','supplier_price'=>1000000,'china_delivery'=>100000,'packaging'=>50000,'freight'=>300000,'margin'=>400000,'commission'=>0,'total'=>2850000,
             ]],
         ])->assertRedirect('/modules/devis');
 
         $quote=DB::table('quotes')->where('client_name','Nom personnalisé')->first();
         $this->assertSame('relance_1',$quote->status);
+        $this->assertSame('2026-08-28',$quote->quote_date);
         $this->assertSame('maritime',$quote->shipping_mode);
         $this->assertSame('BOA 00001',$quote->bank_details);
         $item=DB::table('quote_items')->where('quote_id',$quote->id)->first();
