@@ -50,7 +50,7 @@
     <table class="meta">
         <tr>
             <td><div class="box"><div class="label">Destinataire</div><div class="client">{{ $document->client_name }}</div><div>{{ $document->client_number }}</div><div>{{ $document->client_contact }}</div>@if($document->client_address)<div>{{ $document->client_address }}</div>@endif</div></td>
-            <td><div class="box box-right"><div class="label">Informations du document</div><div style="margin-top:5px"><strong>Date :</strong> {{ \Carbon\Carbon::parse($module==='devis'?($document->sent_at?:$document->created_at):$document->issued_at)->format('d/m/Y') }}</div>@if($module==='devis')<div><strong>Valide jusqu’au :</strong> {{ \Carbon\Carbon::parse($document->valid_until)->format('d/m/Y') }}</div><div><strong>Mode d’envoi :</strong> {{ ucfirst($document->shipping_mode?:'Non défini') }}</div>@else<div><strong>Commande :</strong> {{ $document->order_number }}</div>@endif<div class="status">{{ str_replace('_',' ',$document->status) }}</div></div></td>
+            <td><div class="box box-right"><div class="label">Informations du document</div><div style="margin-top:5px"><strong>Date :</strong> {{ \Carbon\Carbon::parse($module==='devis'?($document->quote_date?:$document->created_at):$document->issued_at)->format('d/m/Y') }}</div>@if($module==='devis')<div><strong>Valide jusqu’au :</strong> {{ \Carbon\Carbon::parse($document->valid_until)->format('d/m/Y') }}</div><div><strong>Mode d’envoi :</strong> {{ ucfirst($document->shipping_mode?:'Non défini') }}</div>@else<div><strong>Commande :</strong> {{ $document->order_number }}</div>@endif<div class="status">{{ str_replace('_',' ',$document->status) }}</div></div></td>
         </tr>
     </table>
 

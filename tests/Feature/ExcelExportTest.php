@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Tests\TestCase;
@@ -80,6 +81,30 @@ class ExcelExportTest extends TestCase
         $this->assertSame('En transit',$sheet->getCell('E5')->getValue());
         $this->assertSame(5,$sheet->getHighestDataRow());
         $this->assertCount(1,$sheet->getDrawingCollection());
+    }
+
+    public function test_quote_export_contains_quote_date_product_rows_and_product_photos(): void
+    {
+        $manager=User::where('email','manager@madina-import.mg')->firstOrFail();
+        $quote=DB::table('quotes')->where('number','DV-MI-2026-001')->first();
+        $photo='products/quote-product.png';
+        Storage::disk('persistent')->put($photo,base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='));
+        DB::table('quotes')->where('id',$quote->id)->update(['quote_date'=>'2026-08-20']);
+        DB::table('quote_items')->where('quote_id',$quote->id)->update(['photo_path'=>$photo]);
+
+        $this->actingAs($manager)->get('/modules/devis/export?q=DV-MI-2026-001')->assertOk();
+
+        $path=collect(Storage::disk('persistent')->allFiles('exports'))->first(fn($file)=>str_ends_with($file,'.xlsx'));
+        $temporary=tempnam(sys_get_temp_dir(),'madina-quote-');
+        file_put_contents($temporary,Storage::disk('persistent')->get($path));
+        $sheet=IOFactory::load($temporary)->getActiveSheet();
+        unlink($temporary);
+
+        $this->assertSame('Date du devis',$sheet->getCell('B4')->getValue());
+        $this->assertSame('20/08/2026',$sheet->getCell('B5')->getValue());
+        $this->assertSame('Chaise de restaurant velours',$sheet->getCell('D5')->getValue());
+        $this->assertSame('Photo',$sheet->getCell('E4')->getValue());
+        $this->assertCount(2,$sheet->getDrawingCollection());
     }
 
 }

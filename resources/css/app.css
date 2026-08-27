@@ -28,3 +28,19 @@
   table tbody tr { @apply transition hover:bg-[#FCF108]/[.04]; }
   .status { @apply inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold capitalize text-gray-600; }
 }
+
+@media print {
+  @page { size: A4 portrait; margin: 10mm; }
+  html, body { background:#fff !important; }
+  body { print-color-adjust:exact; -webkit-print-color-adjust:exact; }
+  .order-print { max-width:none !important; }
+  .order-print > section { margin-bottom:5mm !important; box-shadow:none !important; }
+  .order-print-summary { break-inside:avoid-page; page-break-inside:avoid; }
+  .order-print-section .panel-head { break-after:avoid-page; page-break-after:avoid; }
+  .order-products-grid, .order-packages-grid { display:grid !important; grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:4mm !important; }
+  .order-product-card, .order-package-card, .order-packages-total { break-inside:avoid-page; page-break-inside:avoid; }
+  .order-product-card dl, .order-package-card > div, .order-package-card [class*="justify-between"] { break-inside:avoid-page; page-break-inside:avoid; }
+  .order-product-photo { height:34mm !important; }
+  .order-product-card > div:last-child, .order-package-card { padding:3.5mm !important; }
+  .order-product-card p, .order-package-card p { orphans:3; widows:3; }
+}

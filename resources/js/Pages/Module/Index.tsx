@@ -8,7 +8,8 @@ const display=(key:string,value:any)=>{
  if(value===null||value===undefined||value==='') return '—';
  if(key==='active') return value?'Actif':'Inactif';
  if(moneyKeys.some(item=>key.includes(item))) return new Intl.NumberFormat('de-DE',{maximumFractionDigits:0}).format(Number(value))+' Ar';
- if(key.endsWith('_at')||key==='month'||key==='valid_until') return new Date(value).toLocaleDateString('fr-FR');
+ if(key.endsWith('_at')) return new Date(value).toLocaleDateString('fr-FR');
+ if(key.endsWith('_date')||key==='month'||key==='valid_until') return new Date(`${value}T00:00:00`).toLocaleDateString('fr-FR');
  return String(value).replaceAll('_',' ');
 };
 

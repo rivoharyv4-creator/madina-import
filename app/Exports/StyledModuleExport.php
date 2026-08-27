@@ -3,6 +3,7 @@
 namespace App\Exports;
 
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithCustomStartCell;
 use Maatwebsite\Excel\Concerns\WithDrawings;
@@ -42,7 +43,7 @@ class StyledModuleExport implements FromArray, WithCustomStartCell, WithDrawings
         return 'A4';
     }
 
-    public function drawings(): Drawing
+    public function drawings(): array
     {
         $drawing=new Drawing();
         $drawing->setName('Madina Import');
@@ -51,7 +52,26 @@ class StyledModuleExport implements FromArray, WithCustomStartCell, WithDrawings
         $drawing->setCoordinates('A1');
         $drawing->setOffsetX(7);
         $drawing->setOffsetY(3);
-        return $drawing;
+        $drawings=[$drawing];
+        $photoColumn=array_search('photo_path',array_keys($this->columns),true);
+        if($photoColumn===false) return $drawings;
+
+        foreach($this->rows as $index=>$row){
+            $path=$row['photo_path']??null;
+            if(!$path||!Storage::disk('persistent')->exists($path)) continue;
+            $absolutePath=Storage::disk('persistent')->path($path);
+            if(@getimagesize($absolutePath)===false) continue;
+
+            $photo=new Drawing();
+            $photo->setName((string)($row['product_name']??$row['name']??'Photo produit'));
+            $photo->setPath($absolutePath);
+            $photo->setHeight(55);
+            $photo->setCoordinates(Coordinate::stringFromColumnIndex($photoColumn+1).($index+self::HEADER_ROW+1));
+            $photo->setOffsetX(5);
+            $photo->setOffsetY(4);
+            $drawings[]=$photo;
+        }
+        return $drawings;
     }
 
     public function title(): string
@@ -85,7 +105,7 @@ class StyledModuleExport implements FromArray, WithCustomStartCell, WithDrawings
             $sheet->getRowDimension(self::HEADER_ROW)->setRowHeight(26);
 
             for($row=self::HEADER_ROW+1;$row<=$lastRow;$row++){
-                $sheet->getRowDimension($row)->setRowHeight(23);
+                $sheet->getRowDimension($row)->setRowHeight(array_key_exists('photo_path',$this->columns)?48:23);
                 if($row%2===0) $sheet->getStyle("A{$row}:{$lastColumn}{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F7F7F4');
             }
             $sheet->getStyle("A5:{$lastColumn}{$lastRow}")->applyFromArray([
@@ -99,6 +119,7 @@ class StyledModuleExport implements FromArray, WithCustomStartCell, WithDrawings
                 $sheet->getColumnDimension($letter)->setWidth($width);
                 if($this->isMoney($key)) $sheet->getStyle("{$letter}5:{$letter}{$lastRow}")->getNumberFormat()->setFormatCode('#,##0 "Ar"');
                 if(in_array($key,['quantity','moq','quality_rating'],true)) $sheet->getStyle("{$letter}5:{$letter}{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                if($key==='photo_path') $sheet->getColumnDimension($letter)->setWidth(15);
             }
 
             $sheet->freezePane('A5');
@@ -113,9 +134,10 @@ class StyledModuleExport implements FromArray, WithCustomStartCell, WithDrawings
     private function value(string $key, mixed $value): mixed
     {
         if($value===null||$value==='') return '';
+        if($key==='photo_path') return '';
         if($key==='active') return $value?'Actif':'Inactif';
         if($this->isMoney($key)||in_array($key,['quantity','moq','quality_rating'],true)) return (float)$value;
-        if($key==='month'||str_ends_with($key,'_at')||in_array($key,['valid_until','due_at'],true)){
+        if($key==='month'||str_ends_with($key,'_at')||str_ends_with($key,'_date')||in_array($key,['valid_until','due_at'],true)){
             try{return Carbon::parse($value)->format($key==='month'?'m/Y':'d/m/Y');}catch(\Throwable){return (string)$value;}
         }
         return ucfirst(str_replace('_',' ',(string)$value));
