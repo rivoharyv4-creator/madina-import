@@ -42,7 +42,7 @@
     <table class="header">
         <tr>
             <td style="width:110px">@if($logoData)<img class="logo" src="{{ $logoData }}" alt="Madina Import">@endif</td>
-            <td><div class="brand">{{ $company['name'] }}</div><div class="tagline">{{ $company['address'] }}<br>Tél. : {{ $company['contact'] }} · WhatsApp : {{ $company['whatsapp'] }}<br>{{ $company['email'] }}</div></td>
+            <td><div class="brand">{{ $company['name'] }}</div><div class="tagline">{{ $company['address'] }}<br>Tél. : {{ $company['contact'] }} · WhatsApp : {{ $company['whatsapp'] }}<br>{{ $company['email'] }}<br>NIF : {{ $company['nif'] }} · RCS : {{ $company['rcs'] }}<br>STAT : {{ $company['stat'] }}</div></td>
             <td><div class="document-title">{{ $title }}</div><div class="number">N° {{ $document->number }}</div></td>
         </tr>
     </table>

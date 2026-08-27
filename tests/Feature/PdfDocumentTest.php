@@ -62,6 +62,9 @@ class PdfDocumentTest extends TestCase
         $this->assertStringContainsString('+261 34 98 732 08',$html);
         $this->assertStringContainsString('+86 158 0200 3702',$html);
         $this->assertStringContainsString('contactmadinaimport@gmail.com',$html);
+        $this->assertStringContainsString('NIF : 4019196145',$html);
+        $this->assertStringContainsString('RCS : 2025B00524',$html);
+        $this->assertStringContainsString('STAT : 46101 11 2025 0 10528',$html);
         $this->assertStringNotContainsString('Prix total sans marge',$html);
         $this->assertStringNotContainsString('>Marge<',$html);
         $this->assertStringNotContainsString('Fournisseur :',$html);

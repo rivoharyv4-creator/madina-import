@@ -213,10 +213,13 @@ class ModuleCreationTest extends TestCase
         $this->actingAs($this->manager)->get("/modules/commandes/{$order->id}")->assertInertia(fn(Assert $page)=>$page
             ->component('Module/OrderShow')
             ->where('order.number',$order->number)
-            ->where('company.address','Ambatomainty Lot 102 B Bis Antananarivo')
+            ->where('company.address','Lot IIB 106 Ambatomainty Antananarivo')
             ->where('company.contact','+261 34 98 732 08')
             ->where('company.whatsapp','+86 158 0200 3702')
             ->where('company.email','contactmadinaimport@gmail.com')
+            ->where('company.nif','4019196145')
+            ->where('company.rcs','2025B00524')
+            ->where('company.stat','46101 11 2025 0 10528')
             ->has('items',fn(Assert $items)=>$items->where('0.photo_url','/product-photo/order-preview.jpg')->etc())
             ->has('packages',fn(Assert $packages)=>$packages->where('0.reference','COLIS-PREVIEW')->where('0.items.0.name',$item->name)->etc())
         );
