@@ -126,7 +126,7 @@ class ModuleCreationTest extends TestCase
         $this->assertDatabaseHas('stock_movements',['inventory_product_id'=>$product->id,'type'=>'inventaire','after_quantity'=>6]);
 
         $payment=DB::table('client_payments')->where('reference','MVOLA-829104')->first();
-        $this->actingAs($this->manager)->put("/modules/paiements/{$payment->id}",['client_id'=>$payment->client_id,'order_id'=>$payment->order_id,'invoice_id'=>$payment->invoice_id,'paid_at'=>$payment->paid_at,'amount'=>4000000,'allocated_amount'=>3800000,'method'=>$payment->method,'reference'=>$payment->reference,'type'=>$payment->type,'notes'=>'Affectation corrigée'])->assertRedirect('/modules/paiements');
+        $this->actingAs($this->manager)->put("/modules/paiements/{$payment->id}",['client_id'=>$payment->client_id,'new_client_name'=>'','new_client_contact'=>'','new_client_type'=>'','new_client_address'=>'','order_id'=>$payment->order_id,'invoice_id'=>$payment->invoice_id,'paid_at'=>$payment->paid_at,'amount'=>4000000,'allocated_amount'=>3800000,'method'=>$payment->method,'reference'=>$payment->reference,'type'=>$payment->type,'notes'=>'Affectation corrigée'])->assertRedirect('/modules/paiements');
         $this->assertSame(200000.0,(float)DB::table('clients')->where('id',$payment->client_id)->value('credit_balance'));
         $this->assertDatabaseHas('audit_logs',['auditable_id'=>$payment->id,'event'=>'paiements.modifie']);
     }
