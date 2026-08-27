@@ -59,6 +59,8 @@
 </div>
 @endif
 
+@if($payment->payment_object)<div class="notes"><div class="label">Objet du paiement</div><strong>{{ $payment->payment_object }}</strong></div>@endif
+
 @if($payment->notes)<div class="notes"><div class="label">Note</div>{{ $payment->notes }}</div>@endif
 
 <table class="signatures"><tr><td><div class="line">Signature du client</div></td><td><div class="line">Cachet et signature Madina Import</div></td></tr></table>

@@ -170,7 +170,10 @@ class ModuleController extends Controller
 
         $payment->receipt_number='REC-MI-'.date('Y',strtotime($payment->paid_at)).'-'.str_pad((string)$payment->id,5,'0',STR_PAD_LEFT);
         $payment->credit_amount=max(0,(float)$payment->amount-(float)$payment->allocated_amount);
-        $payment->type_label=$this->paymentTypeLabel($payment->type);
+        [$paymentReason,$paymentObject,$paymentNotes]=$this->paymentReasonAndNotes($payment->type,$payment->notes);
+        $payment->type_label=$this->paymentTypeLabel($paymentReason);
+        $payment->payment_object=$paymentObject;
+        $payment->notes=$paymentNotes;
         $logoPath=public_path('brand/madina-import-logo-transparent.png');
         $logoData=file_exists($logoPath)?'data:image/png;base64,'.base64_encode(file_get_contents($logoPath)):null;
         $company=config('madina.company');
@@ -319,6 +322,7 @@ class ModuleController extends Controller
     {
         if(!empty($data['new_client_name'])) $data['client_id']=DB::table('clients')->insertGetId(['number'=>$numbers->next('client'),'name'=>$data['new_client_name'],'contact'=>$data['new_client_contact'],'type'=>$data['new_client_type'],'address'=>$data['new_client_address']??null,'notes'=>'Créé directement depuis un paiement','active'=>true,'credit_balance'=>0,'created_at'=>now(),'updated_at'=>now()]);
         $data=Arr::except($data,['new_client_name','new_client_contact','new_client_type','new_client_address']);
+        $data=$this->encodePaymentReason($data);
         $amount=(float)$data['amount']; $allocated=$this->paymentAllocation($data);
         $id=DB::table('client_payments')->insertGetId([...$data,'allocated_amount'=>$allocated,'status'=>'valide','created_at'=>now(),'updated_at'=>now()]);
         if($amount>$allocated) DB::table('clients')->where('id',$data['client_id'])->increment('credit_balance',$amount-$allocated);
@@ -375,6 +379,7 @@ class ModuleController extends Controller
         if($module==='devis') { $values['client_contact']=$record->contact; $item=DB::table('quote_items')->where('quote_id',$record->id)->first(); if($item) $values=[...$values,'product_name'=>$item->name,'specifications'=>$item->specifications,'quantity'=>$item->quantity,'supplier_id'=>$item->supplier_id,'commission'=>$item->commission]; }
         if($module==='commandes') { $item=DB::table('order_items')->where('order_id',$record->id)->first(); if($item) $values=[...$values,'product_name'=>$item->name,'specifications'=>$item->specifications,'quantity'=>$item->quantity,'supplier_id'=>$item->supplier_id,'supplier_price'=>$record->supplier_total]; }
         if($module==='achats') $values['order_id']=DB::table('supplier_payment_allocations')->where('supplier_payment_id',$record->id)->value('order_id');
+        if($module==='paiements') { [$values['type'],$values['payment_object'],$values['notes']]=$this->paymentReasonAndNotes($record->type,$record->notes); }
         if($module==='salaires') { $values['irsa_value']=$record->irsa_mode==='pourcentage'?$record->irsa_rate:$record->irsa_amount; $values['month']=date('Y-m',strtotime($record->month)); }
         return $values;
     }
@@ -394,7 +399,7 @@ class ModuleController extends Controller
             DB::table('orders')->where('id',$id)->update(['client_id'=>$data['client_id'],'quote_id'=>$data['quote_id']??null,'origin'=>!empty($data['quote_id'])?'devis':'directe','ordered_at'=>$data['ordered_at'],'shipping_mode'=>$data['shipping_mode']??null,'cbm'=>$cbm,'freight'=>$freight,'supplier_total'=>$supplierTotal,'commission_enabled'=>$enabled,'commission_base'=>$supplierTotal,'commission_rate'=>$data['commission_rate']??8,'commission_amount'=>$commission,'margin'=>$margin,'client_total'=>$total,'deposit'=>$deposit,'balance_due'=>$total-$deposit,'status'=>$data['status'],'notes'=>$data['notes']??null,'updated_at'=>now()]);
             $photos=DB::table('order_items')->where('order_id',$id)->pluck('photo_path','id')->all(); DB::table('order_packages')->where('order_id',$id)->delete(); DB::table('order_items')->where('order_id',$id)->delete(); $itemIds=$this->insertOrderItems($id,$data['items'],$enabled,$data['status'],$photos); $this->insertPackages($id,$data['packages']??[],$itemIds,$data['items']); return;
         }
-        if($module==='paiements') { $data=Arr::except($data,['new_client_name','new_client_contact','new_client_type','new_client_address']); $amount=(float)$data['amount']; $allocated=$this->paymentAllocation($data); $this->reversePaymentEffects($old); DB::table('client_payments')->where('id',$id)->update([...$data,'allocated_amount'=>$allocated,'status'=>'valide','updated_at'=>now()]); $this->applyPaymentEffects((object)[...$data,'amount'=>$amount,'allocated_amount'=>$allocated]); return; }
+        if($module==='paiements') { $data=Arr::except($data,['new_client_name','new_client_contact','new_client_type','new_client_address']); $data=$this->encodePaymentReason($data); $amount=(float)$data['amount']; $allocated=$this->paymentAllocation($data); $this->reversePaymentEffects($old); DB::table('client_payments')->where('id',$id)->update([...$data,'allocated_amount'=>$allocated,'status'=>'valide','updated_at'=>now()]); $this->applyPaymentEffects((object)[...$data,'amount'=>$amount,'allocated_amount'=>$allocated]); return; }
         if($module==='factures') { $order=DB::table('orders')->find($data['order_id']); $subtotal=(float)$data['subtotal']; $paid=(float)($data['paid_amount']??0); if($paid>$subtotal) throw ValidationException::withMessages(['paid_amount'=>'Le montant reçu ne peut pas dépasser le total.']); DB::table('invoices')->where('id',$id)->update(['order_id'=>$order->id,'client_id'=>$order->client_id,'type'=>$data['type'],'issued_at'=>$data['issued_at'],'subtotal'=>$subtotal,'paid_amount'=>$paid,'balance_due'=>$subtotal-$paid,'status'=>$paid>=$subtotal?'payee':($paid>0?'partielle':$data['status']),'lines'=>json_encode([['label'=>$data['type']==='frais'?'Frais de commande':'Produits commandés','amount'=>$subtotal]]),'updated_at'=>now()]); return; }
         if($module==='achats') { $proof=$data['proof']??null; DB::table('supplier_payments')->where('id',$id)->update([...Arr::except($data,['order_id','proof']),'proof_path'=>$proof?$this->storePurchaseProof($proof):$old->proof_path,'updated_at'=>now()]); DB::table('supplier_payment_allocations')->where('supplier_payment_id',$id)->update(['order_id'=>$data['order_id'],'amount'=>$data['amount']]); return; }
         if($module==='ventes') { $this->updateLocalSale($id,$old,$data,$userId); return; }
@@ -437,6 +442,35 @@ class ModuleController extends Controller
         ][$type] ?? ucfirst(str_replace('_',' ',$type));
     }
 
+    private function encodePaymentReason(array $data): array
+    {
+        $reason=$data['payment_reason']??$data['type'];
+        $object=base64_encode(trim((string)$data['payment_object']));
+        $notes=trim((string)($data['notes']??''));
+        $data['notes']='[motif:'.$reason."]\n[objet:".$object.']'.($notes!==''?"\n".$notes:'');
+        unset($data['payment_reason'],$data['payment_object']);
+        return $data;
+    }
+
+    private function paymentReasonAndNotes(string $type, ?string $notes): array
+    {
+        if(preg_match('/^\[motif:([a-z_]+)](?:\R)?/u',(string)$notes,$match)){
+            $clean=preg_replace('/^\[motif:[a-z_]+](?:\R)?/u','',(string)$notes);
+            $object='';
+            if(preg_match('/^\[objet:([A-Za-z0-9+\/=]*)](?:\R)?/u',$clean,$objectMatch)){
+                $object=(string)base64_decode($objectMatch[1],true);
+                $clean=preg_replace('/^\[objet:[A-Za-z0-9+\/=]*](?:\R)?/u','',$clean);
+            }
+            return [$match[1],$object,$clean];
+        }
+        return [[
+            'acompte'=>'acompte_commande',
+            'solde'=>'solde_commande',
+            'intermediaire'=>'frais_service',
+            'remboursement'=>'autre',
+        ][$type]??$type,'',$notes];
+    }
+
     private function applyPaymentEffects(object $payment): void
     {
         $unallocated=max(0,(float)$payment->amount-(float)$payment->allocated_amount); if($unallocated>0) DB::table('clients')->where('id',$payment->client_id)->increment('credit_balance',$unallocated);
@@ -467,7 +501,7 @@ class ModuleController extends Controller
             'stock'=>[$input('name','Nom du produit'),$input('photo','Photo du produit (optionnelle)','file',false),$input('quantity','Quantité initiale','number',true,0),$input('purchase_price','Prix d’achat (Ar)','number'),$input('sale_price','Prix de vente (Ar)','number'),$input('alert_threshold','Seuil d’alerte','number',false)],
             'devis'=>[$select('client_id','Client enregistré (optionnel)',$clients,false),$input('client_name','Nom du client'),$input('client_contact','Contact du client'),$select('client_type','Type de client',$o(['revendeur','entrepreneur','particulier','hotel']),true,'particulier'),$input('valid_until','Valide jusqu’au','date'),$select('shipping_mode','Mode d’envoi',[['value'=>'maritime','label'=>'Maritime'],['value'=>'aerien','label'=>'Aérien']]),$input('shipping_delay','Délai d’expédition','text',false),$select('status','Statut',[['value'=>'brouillon','label'=>'Brouillon'],['value'=>'envoye','label'=>'Envoyé'],['value'=>'negociation','label'=>'Négociation'],['value'=>'accepte','label'=>'Accepté'],['value'=>'refuse','label'=>'Refusé'],['value'=>'sans_reponse','label'=>'Sans réponse'],['value'=>'relance_1','label'=>'Relance 1'],['value'=>'relance_2','label'=>'Relance 2']],true,'brouillon'),$input('bank_details','Informations bancaires / compte bancaire','textarea',false),$input('payment_terms','Conditions de paiement','textarea',false),$input('warranty','Garantie','textarea',false),$input('notes','Note / remarque','textarea',false)],
             'commandes'=>[$select('quote_id','Créer à partir du devis n°',$quotes,false),$select('client_id','Client',$clients),$select('commission_enabled','Appliquer une commission',[['value'=>0,'label'=>'Non'],['value'=>1,'label'=>'Oui']],true,0),$input('commission_rate','Taux commission (%)','number',false,8),$input('deposit','Acompte reçu (Ar)','number',false,0),$input('ordered_at','Date de commande','date',true,$today),$select('shipping_mode','Mode d’envoi',$o(['aerien','maritime']),false),$select('status','Statut',[['value'=>'brouillon','label'=>'Brouillon'],['value'=>'demande_recue','label'=>'Demande reçue'],['value'=>'attente_validation','label'=>'Attente validation'],['value'=>'confirmee','label'=>'Confirmée'],['value'=>'acompte_recu','label'=>'Acompte reçu'],['value'=>'achat_lance','label'=>'Achat lancé'],['value'=>'achat_effectue','label'=>'Achat effectué']],true,'brouillon'),$input('notes','Notes internes','textarea',false)],
-            'paiements'=>[$select('client_id','Client',$clients),$select('order_id','Commande à créditer (optionnelle)',$orders,false),$select('invoice_id','Facture à créditer (optionnelle)',$invoices,false),$input('paid_at','Date','date',true,$today),$input('amount','Montant reçu (Ar)','number'),$input('allocated_amount','Montant affecté (Ar)','number',false,0),$select('method','Mode de paiement',$o(['Mobile Money','Virement bancaire','Espèces','Chèque'])),$input('reference','Référence','text',false),$select('type','Motif du paiement',[['value'=>'acompte_commande','label'=>'Acompte de commande'],['value'=>'solde_commande','label'=>'Solde de commande'],['value'=>'fournisseur_chine','label'=>'Paiement fournisseur en Chine'],['value'=>'fret_transport','label'=>'Frais de fret / transport'],['value'=>'frais_service','label'=>'Frais de service'],['value'=>'autre','label'=>'Autre']]),$input('notes','Précision / notes (obligatoire si Autre)','textarea',false)],
+            'paiements'=>[$select('client_id','Client',$clients),$select('order_id','Commande à créditer (optionnelle)',$orders,false),$select('invoice_id','Facture à créditer (optionnelle)',$invoices,false),$input('paid_at','Date','date',true,$today),$input('amount','Montant reçu (Ar)','number'),$input('allocated_amount','Montant affecté (Ar)','number',false,0),$select('method','Mode de paiement',$o(['Mobile Money','Virement bancaire','Espèces','Chèque'])),$input('reference','Référence','text',false),$select('type','Motif du paiement',[['value'=>'acompte_commande','label'=>'Acompte de commande'],['value'=>'solde_commande','label'=>'Solde de commande'],['value'=>'fournisseur_chine','label'=>'Paiement fournisseur en Chine'],['value'=>'fret_transport','label'=>'Frais de fret / transport'],['value'=>'frais_service','label'=>'Frais de service'],['value'=>'autre','label'=>'Autre']]),$input('payment_object','Objet du paiement','text'),$input('notes','Précision / notes (obligatoire si Autre)','textarea',false)],
             'factures'=>[$select('order_id','Commande',$orders),$select('type','Type de facture',$o(['produits','frais'])),$input('issued_at','Date','date',true,$today),$input('subtotal','Total (Ar)','number'),$input('paid_amount','Montant déjà reçu (Ar)','number',false,0),$select('status','Statut',$o(['brouillon','provisoire','finale','payee','partielle']),true,'brouillon')],
             'achats'=>[$select('supplier_id','Fournisseur',$suppliers),$select('order_id','Commande concernée',$orders),$input('paid_at','Date','date',true,$today),$input('amount','Montant payé (Ar)','number'),$select('method','Mode',$o(['WeChat','Alipay','banque'])),$input('reference','Référence','text',false),$input('proof','Justificatif — capture (optionnelle)','file',false),$input('proof_url','Justificatif — lien (optionnel)','url',false),$select('status','Statut du paiement',$o(['paye','partiel','en_attente'])),$input('notes','Notes de suivi','textarea',false)],
             'logistique'=>[$select('order_id','Commande',$orders),$input('tracking','Tracking fournisseur','text',false),$select('mode','Mode',$o(['aerien','maritime'])),$input('weight','Poids (kg)','number',false),$input('cbm','Volume / CBM','number',false),$input('cost','Coût de livraison (Ar)','number',false,0),$input('forwarder','Transitaire','text',false),$input('china_departure_at','Départ de Chine','date',false),$input('expected_madagascar_at','Arrivée prévue','date',false),$select('status','Statut',$o(['en_attente','en_transit','arrive_en_chine','expedie','arrive_madagascar','remis_client']))],

@@ -49,7 +49,7 @@ class ModuleCreationTest extends TestCase
 
         $this->actingAs($this->manager)->post('/modules/paiements',[
             'client_id'=>$client->id,'paid_at'=>'2026-08-27','amount'=>100000,'allocated_amount'=>0,
-            'method'=>'Espèces','reference'=>'AUTRE-SANS-NOTE','type'=>'autre','notes'=>'',
+            'method'=>'Espèces','reference'=>'AUTRE-SANS-NOTE','type'=>'autre','payment_object'=>'Paiement exceptionnel','notes'=>'',
         ])->assertSessionHasErrors('notes');
     }
 
@@ -148,7 +148,7 @@ class ModuleCreationTest extends TestCase
         $this->assertDatabaseHas('stock_movements',['inventory_product_id'=>$product->id,'type'=>'inventaire','after_quantity'=>6]);
 
         $payment=DB::table('client_payments')->where('reference','MVOLA-829104')->first();
-        $this->actingAs($this->manager)->put("/modules/paiements/{$payment->id}",['client_id'=>$payment->client_id,'new_client_name'=>'','new_client_contact'=>'','new_client_type'=>'','new_client_address'=>'','order_id'=>$payment->order_id,'invoice_id'=>$payment->invoice_id,'paid_at'=>$payment->paid_at,'amount'=>4000000,'allocated_amount'=>3800000,'method'=>$payment->method,'reference'=>$payment->reference,'type'=>$payment->type,'notes'=>'Affectation corrigée'])->assertRedirect('/modules/paiements');
+        $this->actingAs($this->manager)->put("/modules/paiements/{$payment->id}",['client_id'=>$payment->client_id,'new_client_name'=>'','new_client_contact'=>'','new_client_type'=>'','new_client_address'=>'','order_id'=>$payment->order_id,'invoice_id'=>$payment->invoice_id,'paid_at'=>$payment->paid_at,'amount'=>4000000,'allocated_amount'=>3800000,'method'=>$payment->method,'reference'=>$payment->reference,'type'=>$payment->type,'payment_object'=>'Acompte mobilier','notes'=>'Affectation corrigée'])->assertRedirect('/modules/paiements');
         $this->assertSame(200000.0,(float)DB::table('clients')->where('id',$payment->client_id)->value('credit_balance'));
         $this->assertDatabaseHas('audit_logs',['auditable_id'=>$payment->id,'event'=>'paiements.modifie']);
     }
@@ -160,7 +160,7 @@ class ModuleCreationTest extends TestCase
         $beforeCredit=(float)DB::table('clients')->where('id',$order->client_id)->value('credit_balance');
         $this->actingAs($this->manager)->post('/modules/paiements',[
             'client_id'=>$order->client_id,'order_id'=>$order->id,'invoice_id'=>$invoice->id,'paid_at'=>'2026-08-25','amount'=>1200000,
-            'allocated_amount'=>1000000,'method'=>'Mobile Money','reference'=>'TEST-PAY-001','type'=>'frais_service','notes'=>'Paiement test',
+            'allocated_amount'=>1000000,'method'=>'Mobile Money','reference'=>'TEST-PAY-001','type'=>'frais_service','payment_object'=>'Frais de gestion commande','notes'=>'Paiement test',
         ])->assertRedirect('/modules/paiements');
         $this->assertSame($beforeCredit+200000,(float)DB::table('clients')->where('id',$order->client_id)->value('credit_balance'));
         $this->assertSame(2720000.0,(float)DB::table('orders')->where('id',$order->id)->value('balance_due'));
@@ -174,10 +174,10 @@ class ModuleCreationTest extends TestCase
 
         $this->actingAs($this->manager)->post('/modules/paiements',[
             'client_id'=>$client->id,'paid_at'=>'2026-08-25','amount'=>750000,'allocated_amount'=>500000,
-            'method'=>'Virement bancaire','reference'=>'CREDIT-FUTUR-001','type'=>'acompte_commande','notes'=>'Avance pour une future commande',
+            'method'=>'Virement bancaire','reference'=>'CREDIT-FUTUR-001','type'=>'acompte_commande','payment_object'=>'Avance future commande','notes'=>'Avance pour une future commande',
         ])->assertRedirect('/modules/paiements');
 
-        $this->assertDatabaseHas('client_payments',['client_id'=>$client->id,'order_id'=>null,'invoice_id'=>null,'amount'=>750000,'allocated_amount'=>0]);
+        $this->assertDatabaseHas('client_payments',['client_id'=>$client->id,'order_id'=>null,'invoice_id'=>null,'amount'=>750000,'allocated_amount'=>0,'type'=>'acompte','notes'=>"[motif:acompte_commande]\n[objet:".base64_encode('Avance future commande')."]\nAvance pour une future commande"]);
         $this->assertSame($before+750000,(float)DB::table('clients')->where('id',$client->id)->value('credit_balance'));
     }
 
@@ -194,6 +194,7 @@ class ModuleCreationTest extends TestCase
             'method'=>'Espèces',
             'reference'=>'CREDIT-MANUEL-001',
             'type'=>'acompte_commande',
+            'payment_object'=>'Réservation de future commande',
             'notes'=>'Avance pour une future commande',
         ])->assertRedirect('/modules/paiements');
 

@@ -66,7 +66,7 @@ return new class extends Migration {
         Schema::create('client_payments', function (Blueprint $t) {
             $t->id(); $t->foreignId('client_id')->constrained(); $t->foreignId('order_id')->nullable()->constrained()->nullOnDelete(); $t->foreignId('invoice_id')->nullable()->constrained()->nullOnDelete();
             $t->date('paid_at'); $t->decimal('amount',18,2); $t->decimal('allocated_amount',18,2)->default(0); $t->string('method'); $t->string('reference')->nullable();
-            $t->enum('type',['acompte_commande','solde_commande','fournisseur_chine','fret_transport','frais_service','autre']); $t->string('status')->default('valide'); $t->text('notes')->nullable(); $t->timestamps(); $t->index(['client_id','paid_at','status']);
+            $t->enum('type',['acompte','intermediaire','solde','remboursement']); $t->string('status')->default('valide'); $t->text('notes')->nullable(); $t->timestamps(); $t->index(['client_id','paid_at','status']);
         });
         Schema::create('supplier_payments', function (Blueprint $t) {
             $t->id(); $t->foreignId('supplier_id')->constrained(); $t->date('paid_at'); $t->decimal('amount',18,2); $t->enum('method',['WeChat','Alipay','banque']);
