@@ -96,8 +96,8 @@ class DatabaseSeeder extends Seeder
             $invoiceIds=DB::table('invoices')->pluck('id','number');
 
             $payments=[
-                ['client_id'=>$clientIds['CLI-2026-001'],'order_id'=>$orderIds['MI-2026-001'],'invoice_id'=>$invoiceIds['FA-MI-2026-001'],'paid_at'=>$now->copy()->subDays(14)->toDateString(),'amount'=>4000000,'allocated_amount'=>4000000,'method'=>'Mobile Money','reference'=>'MVOLA-829104','type'=>'acompte','status'=>'valide','notes'=>'Acompte commande chaises'],
-                ['client_id'=>$clientIds['CLI-2026-002'],'order_id'=>$orderIds['MI-2026-002'],'invoice_id'=>$invoiceIds['FA-MI-2026-002'],'paid_at'=>$now->copy()->subDays(8)->toDateString(),'amount'=>3250000,'allocated_amount'=>3000000,'method'=>'Virement bancaire','reference'=>'BOA-26081742','type'=>'acompte','status'=>'valide','notes'=>'Excédent de 250 000 Ar conservé en crédit'],
+                ['client_id'=>$clientIds['CLI-2026-001'],'order_id'=>$orderIds['MI-2026-001'],'invoice_id'=>$invoiceIds['FA-MI-2026-001'],'paid_at'=>$now->copy()->subDays(14)->toDateString(),'amount'=>4000000,'allocated_amount'=>4000000,'method'=>'Mobile Money','reference'=>'MVOLA-829104','type'=>'acompte_commande','status'=>'valide','notes'=>'Acompte commande chaises'],
+                ['client_id'=>$clientIds['CLI-2026-002'],'order_id'=>$orderIds['MI-2026-002'],'invoice_id'=>$invoiceIds['FA-MI-2026-002'],'paid_at'=>$now->copy()->subDays(8)->toDateString(),'amount'=>3250000,'allocated_amount'=>3000000,'method'=>'Virement bancaire','reference'=>'BOA-26081742','type'=>'acompte_commande','status'=>'valide','notes'=>'Excédent de 250 000 Ar conservé en crédit'],
             ];
             foreach($payments as &$payment){$payment['created_at']=$now;$payment['updated_at']=$now;}
             unset($payment);

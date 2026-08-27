@@ -45,21 +45,19 @@
 
 <table class="grid"><tr>
     <td><div class="box"><div class="label">Reçu de</div><div class="value">{{ $payment->client_name }}</div><div>{{ $payment->client_number }}</div><div>{{ $payment->client_contact }}</div>@if($payment->client_address)<div>{{ $payment->client_address }}</div>@endif</div></td>
-    <td><div class="box right"><div class="label">Informations du paiement</div><div class="value">{{ \Carbon\Carbon::parse($payment->paid_at)->format('d/m/Y') }}</div><div>Mode : {{ $payment->method }}</div><div>Type : {{ ucfirst(str_replace('_',' ',$payment->type)) }}</div>@if($payment->reference)<div>Référence : {{ $payment->reference }}</div>@endif</div></td>
+    <td><div class="box right"><div class="label">Informations du paiement</div><div class="value">{{ \Carbon\Carbon::parse($payment->paid_at)->format('d/m/Y') }}</div><div>Mode : {{ $payment->method }}</div><div>Motif : {{ $payment->type_label }}</div>@if($payment->reference)<div>Référence : {{ $payment->reference }}</div>@endif</div></td>
 </tr></table>
 
 <div class="amount"><div class="label">Montant reçu</div><strong>{{ number_format((float)$payment->amount,0,',','.') }} Ar</strong></div>
 
-<div class="allocation">
 @if($payment->order_number || $payment->invoice_number)
+<div class="allocation">
     Montant affecté : <strong>{{ number_format((float)$payment->allocated_amount,0,',','.') }} Ar</strong>
     @if($payment->order_number)<br>Commande : {{ $payment->order_number }}@endif
     @if($payment->invoice_number)<br>Facture : {{ $payment->invoice_number }}@endif
     @if($payment->credit_amount>0)<br>Crédit ajouté au compte client : <strong>{{ number_format($payment->credit_amount,0,',','.') }} Ar</strong>@endif
-@else
-    La totalité du paiement, soit <strong>{{ number_format((float)$payment->amount,0,',','.') }} Ar</strong>, est enregistrée comme crédit sur le compte client pour une future commande.
-@endif
 </div>
+@endif
 
 @if($payment->notes)<div class="notes"><div class="label">Note</div>{{ $payment->notes }}</div>@endif
 

@@ -110,7 +110,7 @@ class DemoDataSeeder extends Seeder
                 DB::table('client_payments')->updateOrInsert(['reference' => "PAY-DEMO-$suffix"], [
                     'client_id' => $client->id, 'order_id' => $orderId, 'invoice_id' => $invoiceId, 'paid_at' => $date,
                     'amount' => $deposit, 'allocated_amount' => $deposit, 'method' => ['MVola', 'Orange Money', 'Virement bancaire'][($i - 1) % 3],
-                    'type' => 'acompte', 'status' => 'valide', 'notes' => 'Paiement de démonstration', 'created_at' => $now, 'updated_at' => $now,
+                    'type' => 'acompte_commande', 'status' => 'valide', 'notes' => 'Paiement de démonstration', 'created_at' => $now, 'updated_at' => $now,
                 ]);
 
                 DB::table('supplier_payments')->updateOrInsert(['reference' => "ACH-DEMO-$suffix"], [

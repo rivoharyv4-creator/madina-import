@@ -170,6 +170,7 @@ class ModuleController extends Controller
 
         $payment->receipt_number='REC-MI-'.date('Y',strtotime($payment->paid_at)).'-'.str_pad((string)$payment->id,5,'0',STR_PAD_LEFT);
         $payment->credit_amount=max(0,(float)$payment->amount-(float)$payment->allocated_amount);
+        $payment->type_label=$this->paymentTypeLabel($payment->type);
         $logoPath=public_path('brand/madina-import-logo-transparent.png');
         $logoData=file_exists($logoPath)?'data:image/png;base64,'.base64_encode(file_get_contents($logoPath)):null;
         $company=config('madina.company');
@@ -420,6 +421,22 @@ class ModuleController extends Controller
         return $allocated;
     }
 
+    private function paymentTypeLabel(string $type): string
+    {
+        return [
+            'acompte_commande'=>'Acompte de commande',
+            'solde_commande'=>'Solde de commande',
+            'fournisseur_chine'=>'Paiement fournisseur en Chine',
+            'fret_transport'=>'Frais de fret / transport',
+            'frais_service'=>'Frais de service',
+            'autre'=>'Autre',
+            'acompte'=>'Acompte',
+            'intermediaire'=>'Paiement intermédiaire',
+            'solde'=>'Solde',
+            'remboursement'=>'Remboursement',
+        ][$type] ?? ucfirst(str_replace('_',' ',$type));
+    }
+
     private function applyPaymentEffects(object $payment): void
     {
         $unallocated=max(0,(float)$payment->amount-(float)$payment->allocated_amount); if($unallocated>0) DB::table('clients')->where('id',$payment->client_id)->increment('credit_balance',$unallocated);
@@ -450,7 +467,7 @@ class ModuleController extends Controller
             'stock'=>[$input('name','Nom du produit'),$input('photo','Photo du produit (optionnelle)','file',false),$input('quantity','Quantité initiale','number',true,0),$input('purchase_price','Prix d’achat (Ar)','number'),$input('sale_price','Prix de vente (Ar)','number'),$input('alert_threshold','Seuil d’alerte','number',false)],
             'devis'=>[$select('client_id','Client enregistré (optionnel)',$clients,false),$input('client_name','Nom du client'),$input('client_contact','Contact du client'),$select('client_type','Type de client',$o(['revendeur','entrepreneur','particulier','hotel']),true,'particulier'),$input('valid_until','Valide jusqu’au','date'),$select('shipping_mode','Mode d’envoi',[['value'=>'maritime','label'=>'Maritime'],['value'=>'aerien','label'=>'Aérien']]),$input('shipping_delay','Délai d’expédition','text',false),$select('status','Statut',[['value'=>'brouillon','label'=>'Brouillon'],['value'=>'envoye','label'=>'Envoyé'],['value'=>'negociation','label'=>'Négociation'],['value'=>'accepte','label'=>'Accepté'],['value'=>'refuse','label'=>'Refusé'],['value'=>'sans_reponse','label'=>'Sans réponse'],['value'=>'relance_1','label'=>'Relance 1'],['value'=>'relance_2','label'=>'Relance 2']],true,'brouillon'),$input('bank_details','Informations bancaires / compte bancaire','textarea',false),$input('payment_terms','Conditions de paiement','textarea',false),$input('warranty','Garantie','textarea',false),$input('notes','Note / remarque','textarea',false)],
             'commandes'=>[$select('quote_id','Créer à partir du devis n°',$quotes,false),$select('client_id','Client',$clients),$select('commission_enabled','Appliquer une commission',[['value'=>0,'label'=>'Non'],['value'=>1,'label'=>'Oui']],true,0),$input('commission_rate','Taux commission (%)','number',false,8),$input('deposit','Acompte reçu (Ar)','number',false,0),$input('ordered_at','Date de commande','date',true,$today),$select('shipping_mode','Mode d’envoi',$o(['aerien','maritime']),false),$select('status','Statut',[['value'=>'brouillon','label'=>'Brouillon'],['value'=>'demande_recue','label'=>'Demande reçue'],['value'=>'attente_validation','label'=>'Attente validation'],['value'=>'confirmee','label'=>'Confirmée'],['value'=>'acompte_recu','label'=>'Acompte reçu'],['value'=>'achat_lance','label'=>'Achat lancé'],['value'=>'achat_effectue','label'=>'Achat effectué']],true,'brouillon'),$input('notes','Notes internes','textarea',false)],
-            'paiements'=>[$select('client_id','Client',$clients),$select('order_id','Commande à créditer (optionnelle)',$orders,false),$select('invoice_id','Facture à créditer (optionnelle)',$invoices,false),$input('paid_at','Date','date',true,$today),$input('amount','Montant reçu (Ar)','number'),$input('allocated_amount','Montant affecté (Ar)','number',false,0),$select('method','Mode de paiement',$o(['Mobile Money','Virement bancaire','Espèces','Chèque'])),$input('reference','Référence','text',false),$select('type','Type',[['value'=>'acompte','label'=>'Avance / crédit client'],['value'=>'intermediaire','label'=>'Paiement intermédiaire'],['value'=>'solde','label'=>'Solde'],['value'=>'remboursement','label'=>'Remboursement']]),$input('notes','Notes','textarea',false)],
+            'paiements'=>[$select('client_id','Client',$clients),$select('order_id','Commande à créditer (optionnelle)',$orders,false),$select('invoice_id','Facture à créditer (optionnelle)',$invoices,false),$input('paid_at','Date','date',true,$today),$input('amount','Montant reçu (Ar)','number'),$input('allocated_amount','Montant affecté (Ar)','number',false,0),$select('method','Mode de paiement',$o(['Mobile Money','Virement bancaire','Espèces','Chèque'])),$input('reference','Référence','text',false),$select('type','Motif du paiement',[['value'=>'acompte_commande','label'=>'Acompte de commande'],['value'=>'solde_commande','label'=>'Solde de commande'],['value'=>'fournisseur_chine','label'=>'Paiement fournisseur en Chine'],['value'=>'fret_transport','label'=>'Frais de fret / transport'],['value'=>'frais_service','label'=>'Frais de service'],['value'=>'autre','label'=>'Autre']]),$input('notes','Précision / notes (obligatoire si Autre)','textarea',false)],
             'factures'=>[$select('order_id','Commande',$orders),$select('type','Type de facture',$o(['produits','frais'])),$input('issued_at','Date','date',true,$today),$input('subtotal','Total (Ar)','number'),$input('paid_amount','Montant déjà reçu (Ar)','number',false,0),$select('status','Statut',$o(['brouillon','provisoire','finale','payee','partielle']),true,'brouillon')],
             'achats'=>[$select('supplier_id','Fournisseur',$suppliers),$select('order_id','Commande concernée',$orders),$input('paid_at','Date','date',true,$today),$input('amount','Montant payé (Ar)','number'),$select('method','Mode',$o(['WeChat','Alipay','banque'])),$input('reference','Référence','text',false),$input('proof','Justificatif — capture (optionnelle)','file',false),$input('proof_url','Justificatif — lien (optionnel)','url',false),$select('status','Statut du paiement',$o(['paye','partiel','en_attente'])),$input('notes','Notes de suivi','textarea',false)],
             'logistique'=>[$select('order_id','Commande',$orders),$input('tracking','Tracking fournisseur','text',false),$select('mode','Mode',$o(['aerien','maritime'])),$input('weight','Poids (kg)','number',false),$input('cbm','Volume / CBM','number',false),$input('cost','Coût de livraison (Ar)','number',false,0),$input('forwarder','Transitaire','text',false),$input('china_departure_at','Départ de Chine','date',false),$input('expected_madagascar_at','Arrivée prévue','date',false),$select('status','Statut',$o(['en_attente','en_transit','arrive_en_chine','expedie','arrive_madagascar','remis_client']))],

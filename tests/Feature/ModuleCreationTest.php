@@ -31,6 +31,28 @@ class ModuleCreationTest extends TestCase
         }
     }
 
+    public function test_payment_form_exposes_the_new_payment_reasons(): void
+    {
+        $expected=['Acompte de commande','Solde de commande','Paiement fournisseur en Chine','Frais de fret / transport','Frais de service','Autre'];
+
+        $this->actingAs($this->manager)->get('/modules/paiements/create')->assertInertia(fn(Assert $page)=>$page
+            ->where('fields',function($fields) use($expected){
+                $type=collect($fields)->firstWhere('name','type');
+                return $type['label']==='Motif du paiement'&&collect($type['options'])->pluck('label')->all()===$expected;
+            })
+        );
+    }
+
+    public function test_other_payment_reason_requires_a_note(): void
+    {
+        $client=DB::table('clients')->first();
+
+        $this->actingAs($this->manager)->post('/modules/paiements',[
+            'client_id'=>$client->id,'paid_at'=>'2026-08-27','amount'=>100000,'allocated_amount'=>0,
+            'method'=>'Espèces','reference'=>'AUTRE-SANS-NOTE','type'=>'autre','notes'=>'',
+        ])->assertSessionHasErrors('notes');
+    }
+
     public function test_manager_can_create_and_edit_an_employee_before_preparing_salary(): void
     {
         $this->actingAs($this->manager)->post('/modules/employes',['name'=>'Faneva Andria','position'=>'Agent logistique','monthly_salary'=>950000,'irsa_mode'=>'pourcentage','irsa_value'=>5,'active'=>1])->assertRedirect('/modules/employes');
@@ -138,7 +160,7 @@ class ModuleCreationTest extends TestCase
         $beforeCredit=(float)DB::table('clients')->where('id',$order->client_id)->value('credit_balance');
         $this->actingAs($this->manager)->post('/modules/paiements',[
             'client_id'=>$order->client_id,'order_id'=>$order->id,'invoice_id'=>$invoice->id,'paid_at'=>'2026-08-25','amount'=>1200000,
-            'allocated_amount'=>1000000,'method'=>'Mobile Money','reference'=>'TEST-PAY-001','type'=>'intermediaire','notes'=>'Paiement test',
+            'allocated_amount'=>1000000,'method'=>'Mobile Money','reference'=>'TEST-PAY-001','type'=>'frais_service','notes'=>'Paiement test',
         ])->assertRedirect('/modules/paiements');
         $this->assertSame($beforeCredit+200000,(float)DB::table('clients')->where('id',$order->client_id)->value('credit_balance'));
         $this->assertSame(2720000.0,(float)DB::table('orders')->where('id',$order->id)->value('balance_due'));
@@ -152,7 +174,7 @@ class ModuleCreationTest extends TestCase
 
         $this->actingAs($this->manager)->post('/modules/paiements',[
             'client_id'=>$client->id,'paid_at'=>'2026-08-25','amount'=>750000,'allocated_amount'=>500000,
-            'method'=>'Virement bancaire','reference'=>'CREDIT-FUTUR-001','type'=>'acompte','notes'=>'Avance pour une future commande',
+            'method'=>'Virement bancaire','reference'=>'CREDIT-FUTUR-001','type'=>'acompte_commande','notes'=>'Avance pour une future commande',
         ])->assertRedirect('/modules/paiements');
 
         $this->assertDatabaseHas('client_payments',['client_id'=>$client->id,'order_id'=>null,'invoice_id'=>null,'amount'=>750000,'allocated_amount'=>0]);
@@ -171,7 +193,7 @@ class ModuleCreationTest extends TestCase
             'allocated_amount'=>0,
             'method'=>'Espèces',
             'reference'=>'CREDIT-MANUEL-001',
-            'type'=>'acompte',
+            'type'=>'acompte_commande',
             'notes'=>'Avance pour une future commande',
         ])->assertRedirect('/modules/paiements');
 
