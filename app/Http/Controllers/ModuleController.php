@@ -27,7 +27,7 @@ class ModuleController extends Controller
     private function config(string $module): array
     {
         return [
-            'clients'=>['title'=>'Clients','table'=>'clients','primary'=>'Nouveau client','editable'=>true,'columns'=>['number'=>'N° client','name'=>'Client','contact'=>'Contact','type'=>'Type','active'=>'Statut']],
+            'clients'=>['title'=>'Clients','table'=>'clients','primary'=>'Nouveau client','editable'=>true,'columns'=>['number'=>'N° client','name'=>'Client','contact'=>'Contact','type'=>'Type','credit_balance'=>'Crédit disponible','active'=>'Statut']],
             'devis'=>['title'=>'Devis','table'=>'quotes','primary'=>'Nouveau devis','editable'=>true,'columns'=>['number'=>'N° devis','created_at'=>'Date du devis','client_id'=>'Client','total'=>'Montant','valid_until'=>'Validité','status'=>'Statut']],
             'commandes'=>['title'=>'Commandes','table'=>'orders','primary'=>'Nouvelle commande','editable'=>true,'columns'=>['number'=>'N° commande','client_id'=>'Client','client_total'=>'Total client','ordered_at'=>'Date','status'=>'Statut']],
             'paiements'=>['title'=>'Paiements clients','table'=>'client_payments','primary'=>'Nouveau paiement','editable'=>true,'columns'=>['client_id'=>'Client','paid_at'=>'Date','amount'=>'Montant','method'=>'Mode','status'=>'Statut']],
@@ -157,6 +157,29 @@ class ModuleController extends Controller
         return $this->storage->download($path,$filename);
     }
 
+    public function paymentReceipt(int $id)
+    {
+        $payment=DB::table('client_payments')
+            ->join('clients','clients.id','=','client_payments.client_id')
+            ->leftJoin('orders','orders.id','=','client_payments.order_id')
+            ->leftJoin('invoices','invoices.id','=','client_payments.invoice_id')
+            ->where('client_payments.id',$id)
+            ->select('client_payments.*','clients.number as client_number','clients.name as client_name','clients.contact as client_contact','clients.address as client_address','clients.credit_balance as client_credit_balance','orders.number as order_number','invoices.number as invoice_number')
+            ->first();
+        abort_unless($payment,404);
+
+        $payment->receipt_number='REC-MI-'.date('Y',strtotime($payment->paid_at)).'-'.str_pad((string)$payment->id,5,'0',STR_PAD_LEFT);
+        $payment->credit_amount=max(0,(float)$payment->amount-(float)$payment->allocated_amount);
+        $logoPath=public_path('brand/madina-import-logo-transparent.png');
+        $logoData=file_exists($logoPath)?'data:image/png;base64,'.base64_encode(file_get_contents($logoPath)):null;
+        $company=config('madina.company');
+        $contents=Pdf::loadView('pdf.payment-receipt',compact('payment','logoData','company'))->setPaper('a4')->output();
+        $filename=$payment->receipt_number.'.pdf';
+        $path=$this->storage->putDocumentPdf('receipts',$filename,$contents);
+
+        return $this->storage->download($path,$filename);
+    }
+
     public function update(StoreModuleRequest $request, string $module, int $id, BusinessCalculator $calculator)
     {
         $config=$this->config($module); abort_unless($config['editable']??false,404); $query=DB::table($config['table']); if(DB::getSchemaBuilder()->hasColumn($config['table'],'deleted_at')) $query->whereNull('deleted_at'); $old=$query->find($id); abort_unless($old,404); $data=$request->validated();
@@ -183,7 +206,7 @@ class ModuleController extends Controller
                 'stock'=>$this->createStock($data,$numbers,$request->user()->id),
                 'devis'=>$this->createQuote($data,$numbers),
                 'commandes'=>$this->createOrder($data,$numbers,$request->user()->id),
-                'paiements'=>$this->createClientPayment($data),
+                'paiements'=>$this->createClientPayment($data,$numbers),
                 'factures'=>$this->createInvoice($data,$numbers),
                 'achats'=>$this->createSupplierPayment($data),
                 'logistique'=>DB::table('shipments')->insertGetId([...$data,'created_at'=>$now,'updated_at'=>$now]),
@@ -291,9 +314,11 @@ class ModuleController extends Controller
         }
     }
 
-    private function createClientPayment(array $data): int
+    private function createClientPayment(array $data, NumberSequenceService $numbers): int
     {
-        $amount=(float)$data['amount']; $allocated=(float)($data['allocated_amount']??0); if($allocated>$amount) throw ValidationException::withMessages(['allocated_amount'=>'Le montant affecté ne peut pas dépasser le montant reçu.']);
+        if(!empty($data['new_client_name'])) $data['client_id']=DB::table('clients')->insertGetId(['number'=>$numbers->next('client'),'name'=>$data['new_client_name'],'contact'=>$data['new_client_contact'],'type'=>$data['new_client_type'],'address'=>$data['new_client_address']??null,'notes'=>'Créé directement depuis un paiement','active'=>true,'credit_balance'=>0,'created_at'=>now(),'updated_at'=>now()]);
+        $data=Arr::except($data,['new_client_name','new_client_contact','new_client_type','new_client_address']);
+        $amount=(float)$data['amount']; $allocated=$this->paymentAllocation($data);
         $id=DB::table('client_payments')->insertGetId([...$data,'allocated_amount'=>$allocated,'status'=>'valide','created_at'=>now(),'updated_at'=>now()]);
         if($amount>$allocated) DB::table('clients')->where('id',$data['client_id'])->increment('credit_balance',$amount-$allocated);
         if(!empty($data['order_id'])) { $order=DB::table('orders')->lockForUpdate()->find($data['order_id']); DB::table('orders')->where('id',$order->id)->update(['deposit'=>(float)$order->deposit+$allocated,'balance_due'=>max(0,(float)$order->balance_due-$allocated),'updated_at'=>now()]); }
@@ -368,7 +393,7 @@ class ModuleController extends Controller
             DB::table('orders')->where('id',$id)->update(['client_id'=>$data['client_id'],'quote_id'=>$data['quote_id']??null,'origin'=>!empty($data['quote_id'])?'devis':'directe','ordered_at'=>$data['ordered_at'],'shipping_mode'=>$data['shipping_mode']??null,'cbm'=>$cbm,'freight'=>$freight,'supplier_total'=>$supplierTotal,'commission_enabled'=>$enabled,'commission_base'=>$supplierTotal,'commission_rate'=>$data['commission_rate']??8,'commission_amount'=>$commission,'margin'=>$margin,'client_total'=>$total,'deposit'=>$deposit,'balance_due'=>$total-$deposit,'status'=>$data['status'],'notes'=>$data['notes']??null,'updated_at'=>now()]);
             $photos=DB::table('order_items')->where('order_id',$id)->pluck('photo_path','id')->all(); DB::table('order_packages')->where('order_id',$id)->delete(); DB::table('order_items')->where('order_id',$id)->delete(); $itemIds=$this->insertOrderItems($id,$data['items'],$enabled,$data['status'],$photos); $this->insertPackages($id,$data['packages']??[],$itemIds,$data['items']); return;
         }
-        if($module==='paiements') { $amount=(float)$data['amount']; $allocated=(float)($data['allocated_amount']??0); if($allocated>$amount) throw ValidationException::withMessages(['allocated_amount'=>'Le montant affecté ne peut pas dépasser le montant reçu.']); $this->reversePaymentEffects($old); DB::table('client_payments')->where('id',$id)->update([...$data,'allocated_amount'=>$allocated,'status'=>'valide','updated_at'=>now()]); $this->applyPaymentEffects((object)[...$data,'amount'=>$amount,'allocated_amount'=>$allocated]); return; }
+        if($module==='paiements') { $amount=(float)$data['amount']; $allocated=$this->paymentAllocation($data); $this->reversePaymentEffects($old); DB::table('client_payments')->where('id',$id)->update([...$data,'allocated_amount'=>$allocated,'status'=>'valide','updated_at'=>now()]); $this->applyPaymentEffects((object)[...$data,'amount'=>$amount,'allocated_amount'=>$allocated]); return; }
         if($module==='factures') { $order=DB::table('orders')->find($data['order_id']); $subtotal=(float)$data['subtotal']; $paid=(float)($data['paid_amount']??0); if($paid>$subtotal) throw ValidationException::withMessages(['paid_amount'=>'Le montant reçu ne peut pas dépasser le total.']); DB::table('invoices')->where('id',$id)->update(['order_id'=>$order->id,'client_id'=>$order->client_id,'type'=>$data['type'],'issued_at'=>$data['issued_at'],'subtotal'=>$subtotal,'paid_amount'=>$paid,'balance_due'=>$subtotal-$paid,'status'=>$paid>=$subtotal?'payee':($paid>0?'partielle':$data['status']),'lines'=>json_encode([['label'=>$data['type']==='frais'?'Frais de commande':'Produits commandés','amount'=>$subtotal]]),'updated_at'=>now()]); return; }
         if($module==='achats') { $proof=$data['proof']??null; DB::table('supplier_payments')->where('id',$id)->update([...Arr::except($data,['order_id','proof']),'proof_path'=>$proof?$this->storePurchaseProof($proof):$old->proof_path,'updated_at'=>now()]); DB::table('supplier_payment_allocations')->where('supplier_payment_id',$id)->update(['order_id'=>$data['order_id'],'amount'=>$data['amount']]); return; }
         if($module==='ventes') { $this->updateLocalSale($id,$old,$data,$userId); return; }
@@ -382,6 +407,17 @@ class ModuleController extends Controller
         $unallocated=max(0,(float)$payment->amount-(float)$payment->allocated_amount); $client=DB::table('clients')->lockForUpdate()->find($payment->client_id); DB::table('clients')->where('id',$client->id)->update(['credit_balance'=>max(0,(float)$client->credit_balance-$unallocated),'updated_at'=>now()]);
         if($payment->order_id) { $order=DB::table('orders')->lockForUpdate()->find($payment->order_id); DB::table('orders')->where('id',$order->id)->update(['deposit'=>max(0,(float)$order->deposit-(float)$payment->allocated_amount),'balance_due'=>min((float)$order->client_total,(float)$order->balance_due+(float)$payment->allocated_amount),'updated_at'=>now()]); }
         if($payment->invoice_id) { $invoice=DB::table('invoices')->lockForUpdate()->find($payment->invoice_id); $paid=max(0,(float)$invoice->paid_amount-(float)$payment->allocated_amount); DB::table('invoices')->where('id',$invoice->id)->update(['paid_amount'=>$paid,'balance_due'=>(float)$invoice->subtotal-$paid,'status'=>$paid>0?'partielle':'finale','updated_at'=>now()]); }
+    }
+
+    private function paymentAllocation(array $data): float
+    {
+        $amount=(float)$data['amount'];
+        if(empty($data['order_id'])&&empty($data['invoice_id'])) return 0;
+        $allocated=(float)($data['allocated_amount']??0);
+        if($allocated>$amount) throw ValidationException::withMessages(['allocated_amount'=>'Le montant affecté ne peut pas dépasser le montant reçu.']);
+        if(!empty($data['order_id'])&&DB::table('orders')->where('id',$data['order_id'])->value('client_id')!=$data['client_id']) throw ValidationException::withMessages(['order_id'=>'Cette commande n’appartient pas au client sélectionné.']);
+        if(!empty($data['invoice_id'])&&DB::table('invoices')->where('id',$data['invoice_id'])->value('client_id')!=$data['client_id']) throw ValidationException::withMessages(['invoice_id'=>'Cette facture n’appartient pas au client sélectionné.']);
+        return $allocated;
     }
 
     private function applyPaymentEffects(object $payment): void
@@ -406,7 +442,7 @@ class ModuleController extends Controller
     private function fields(string $module): array
     {
         $select=fn($name,$label,$options,$required=true,$default=null)=>compact('name','label','options','required','default')+['type'=>'select']; $input=fn($name,$label,$type='text',$required=true,$default=null)=>compact('name','label','type','required','default');
-        $clients=DB::table('clients')->where('active',true)->orderBy('name')->get()->map(fn($x)=>['value'=>$x->id,'label'=>$x->name,'contact'=>$x->contact,'address'=>$x->address,'type'=>$x->type])->all(); $suppliers=DB::table('suppliers')->where('active',true)->orderBy('name')->get()->map(fn($x)=>['value'=>$x->id,'label'=>$x->name,'contact'=>$x->contact])->all(); $orders=DB::table('orders')->orderByDesc('id')->get()->map(fn($x)=>['value'=>$x->id,'label'=>$x->number])->all(); $quotes=DB::table('quotes')->whereNull('deleted_at')->orderByDesc('id')->get()->map(fn($x)=>['value'=>$x->id,'label'=>$x->number])->all(); $products=DB::table('inventory_products')->where('quantity','>',0)->orderBy('name')->get()->map(fn($x)=>['value'=>$x->id,'label'=>$x->name.' ('.$x->quantity.')'])->all(); $employees=DB::table('employees')->where('active',true)->get()->map(fn($x)=>['value'=>$x->id,'label'=>$x->name])->all(); $invoices=DB::table('invoices')->orderByDesc('id')->get()->map(fn($x)=>['value'=>$x->id,'label'=>$x->number])->all();
+        $clients=DB::table('clients')->where('active',true)->orderBy('name')->get()->map(fn($x)=>['value'=>$x->id,'label'=>$x->name,'contact'=>$x->contact,'address'=>$x->address,'type'=>$x->type,'credit_balance'=>(float)$x->credit_balance])->all(); $suppliers=DB::table('suppliers')->where('active',true)->orderBy('name')->get()->map(fn($x)=>['value'=>$x->id,'label'=>$x->name,'contact'=>$x->contact])->all(); $orders=DB::table('orders')->orderByDesc('id')->get()->map(fn($x)=>['value'=>$x->id,'label'=>$x->number])->all(); $quotes=DB::table('quotes')->whereNull('deleted_at')->orderByDesc('id')->get()->map(fn($x)=>['value'=>$x->id,'label'=>$x->number])->all(); $products=DB::table('inventory_products')->where('quantity','>',0)->orderBy('name')->get()->map(fn($x)=>['value'=>$x->id,'label'=>$x->name.' ('.$x->quantity.')'])->all(); $employees=DB::table('employees')->where('active',true)->get()->map(fn($x)=>['value'=>$x->id,'label'=>$x->name])->all(); $invoices=DB::table('invoices')->orderByDesc('id')->get()->map(fn($x)=>['value'=>$x->id,'label'=>$x->number])->all();
         $o=fn(array $values)=>array_map(fn($v)=>['value'=>$v,'label'=>ucfirst(str_replace('_',' ',$v))],$values); $today=today()->toDateString();
         return match($module){
             'clients'=>[$input('name','Nom ou raison sociale'),$input('contact','WhatsApp / téléphone'),$select('type','Type de client',$o(['revendeur','entrepreneur','particulier','hotel'])),$input('address','Adresse','text',false),$input('notes','Notes','textarea',false),$select('active','Statut',[['value'=>1,'label'=>'Actif'],['value'=>0,'label'=>'Inactif']],true,1)],
@@ -414,7 +450,7 @@ class ModuleController extends Controller
             'stock'=>[$input('name','Nom du produit'),$input('photo','Photo du produit (optionnelle)','file',false),$input('quantity','Quantité initiale','number',true,0),$input('purchase_price','Prix d’achat (Ar)','number'),$input('sale_price','Prix de vente (Ar)','number'),$input('alert_threshold','Seuil d’alerte','number',false)],
             'devis'=>[$select('client_id','Client enregistré (optionnel)',$clients,false),$input('client_name','Nom du client'),$input('client_contact','Contact du client'),$select('client_type','Type de client',$o(['revendeur','entrepreneur','particulier','hotel']),true,'particulier'),$input('valid_until','Valide jusqu’au','date'),$select('shipping_mode','Mode d’envoi',[['value'=>'maritime','label'=>'Maritime'],['value'=>'aerien','label'=>'Aérien']]),$input('shipping_delay','Délai d’expédition','text',false),$select('status','Statut',[['value'=>'brouillon','label'=>'Brouillon'],['value'=>'envoye','label'=>'Envoyé'],['value'=>'negociation','label'=>'Négociation'],['value'=>'accepte','label'=>'Accepté'],['value'=>'refuse','label'=>'Refusé'],['value'=>'sans_reponse','label'=>'Sans réponse'],['value'=>'relance_1','label'=>'Relance 1'],['value'=>'relance_2','label'=>'Relance 2']],true,'brouillon'),$input('bank_details','Informations bancaires / compte bancaire','textarea',false),$input('payment_terms','Conditions de paiement','textarea',false),$input('warranty','Garantie','textarea',false),$input('notes','Note / remarque','textarea',false)],
             'commandes'=>[$select('quote_id','Créer à partir du devis n°',$quotes,false),$select('client_id','Client',$clients),$select('commission_enabled','Appliquer une commission',[['value'=>0,'label'=>'Non'],['value'=>1,'label'=>'Oui']],true,0),$input('commission_rate','Taux commission (%)','number',false,8),$input('deposit','Acompte reçu (Ar)','number',false,0),$input('ordered_at','Date de commande','date',true,$today),$select('shipping_mode','Mode d’envoi',$o(['aerien','maritime']),false),$select('status','Statut',[['value'=>'brouillon','label'=>'Brouillon'],['value'=>'demande_recue','label'=>'Demande reçue'],['value'=>'attente_validation','label'=>'Attente validation'],['value'=>'confirmee','label'=>'Confirmée'],['value'=>'acompte_recu','label'=>'Acompte reçu'],['value'=>'achat_lance','label'=>'Achat lancé'],['value'=>'achat_effectue','label'=>'Achat effectué']],true,'brouillon'),$input('notes','Notes internes','textarea',false)],
-            'paiements'=>[$select('client_id','Client',$clients),$select('order_id','Commande',$orders,false),$select('invoice_id','Facture',$invoices,false),$input('paid_at','Date','date',true,$today),$input('amount','Montant reçu (Ar)','number'),$input('allocated_amount','Montant affecté (Ar)','number',false,0),$select('method','Mode de paiement',$o(['Mobile Money','Virement bancaire','Espèces','Chèque'])),$input('reference','Référence','text',false),$select('type','Type',$o(['acompte','intermediaire','solde','remboursement'])),$input('notes','Notes','textarea',false)],
+            'paiements'=>[$select('client_id','Client',$clients),$select('order_id','Commande à créditer (optionnelle)',$orders,false),$select('invoice_id','Facture à créditer (optionnelle)',$invoices,false),$input('paid_at','Date','date',true,$today),$input('amount','Montant reçu (Ar)','number'),$input('allocated_amount','Montant affecté (Ar)','number',false,0),$select('method','Mode de paiement',$o(['Mobile Money','Virement bancaire','Espèces','Chèque'])),$input('reference','Référence','text',false),$select('type','Type',[['value'=>'acompte','label'=>'Avance / crédit client'],['value'=>'intermediaire','label'=>'Paiement intermédiaire'],['value'=>'solde','label'=>'Solde'],['value'=>'remboursement','label'=>'Remboursement']]),$input('notes','Notes','textarea',false)],
             'factures'=>[$select('order_id','Commande',$orders),$select('type','Type de facture',$o(['produits','frais'])),$input('issued_at','Date','date',true,$today),$input('subtotal','Total (Ar)','number'),$input('paid_amount','Montant déjà reçu (Ar)','number',false,0),$select('status','Statut',$o(['brouillon','provisoire','finale','payee','partielle']),true,'brouillon')],
             'achats'=>[$select('supplier_id','Fournisseur',$suppliers),$select('order_id','Commande concernée',$orders),$input('paid_at','Date','date',true,$today),$input('amount','Montant payé (Ar)','number'),$select('method','Mode',$o(['WeChat','Alipay','banque'])),$input('reference','Référence','text',false),$input('proof','Justificatif — capture (optionnelle)','file',false),$input('proof_url','Justificatif — lien (optionnel)','url',false),$select('status','Statut du paiement',$o(['paye','partiel','en_attente'])),$input('notes','Notes de suivi','textarea',false)],
             'logistique'=>[$select('order_id','Commande',$orders),$input('tracking','Tracking fournisseur','text',false),$select('mode','Mode',$o(['aerien','maritime'])),$input('weight','Poids (kg)','number',false),$input('cbm','Volume / CBM','number',false),$input('cost','Coût de livraison (Ar)','number',false,0),$input('forwarder','Transitaire','text',false),$input('china_departure_at','Départ de Chine','date',false),$input('expected_madagascar_at','Arrivée prévue','date',false),$select('status','Statut',$o(['en_attente','en_transit','arrive_en_chine','expedie','arrive_madagascar','remis_client']))],

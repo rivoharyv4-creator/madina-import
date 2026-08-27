@@ -20,6 +20,7 @@ return [
         'expenses',
         'invoices',
         'quotes',
+        'receipts',
         'logistics',
         'exports',
     ],

@@ -75,4 +75,23 @@ class PdfDocumentTest extends TestCase
         $quoteId=DB::table('quotes')->value('id');
         $this->get("/modules/devis/{$quoteId}/pdf")->assertRedirect('/login');
     }
+
+    public function test_manager_can_download_a_payment_receipt_as_client_proof(): void
+    {
+        $manager=User::where('email','manager@madina-import.mg')->firstOrFail();
+        $payment=DB::table('client_payments')->orderBy('id')->first();
+
+        $response=$this->actingAs($manager)->get("/modules/paiements/{$payment->id}/recu");
+
+        $filename='REC-MI-'.date('Y',strtotime($payment->paid_at)).'-'.str_pad((string)$payment->id,5,'0',STR_PAD_LEFT).'.pdf';
+        $response->assertOk()->assertHeader('content-type','application/pdf');
+        Storage::disk('persistent')->assertExists('receipts/'.$filename);
+        $this->assertStringStartsWith('%PDF',Storage::disk('persistent')->get('receipts/'.$filename));
+    }
+
+    public function test_payment_receipt_requires_authentication(): void
+    {
+        $paymentId=DB::table('client_payments')->value('id');
+        $this->get("/modules/paiements/{$paymentId}/recu")->assertRedirect('/login');
+    }
 }

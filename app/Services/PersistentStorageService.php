@@ -58,7 +58,7 @@ class PersistentStorageService
 
     public function putDocumentPdf(string $directory, string $filename, string $contents): string
     {
-        abort_unless(in_array($directory,['quotes','invoices'],true),404);
+        abort_unless(in_array($directory,['quotes','invoices','receipts'],true),404);
         $this->ensureDirectories();
         $path=$directory.'/'.basename($filename);
         Storage::disk('persistent')->put($path,$contents);

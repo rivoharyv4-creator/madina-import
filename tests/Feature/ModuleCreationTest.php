@@ -145,6 +145,47 @@ class ModuleCreationTest extends TestCase
         $this->assertSame(2720000.0,(float)DB::table('invoices')->where('id',$invoice->id)->value('balance_due'));
     }
 
+    public function test_unlinked_payment_is_fully_saved_as_credit_for_a_future_order(): void
+    {
+        $client=DB::table('clients')->where('number','CLI-2026-004')->first();
+        $before=(float)$client->credit_balance;
+
+        $this->actingAs($this->manager)->post('/modules/paiements',[
+            'client_id'=>$client->id,'paid_at'=>'2026-08-25','amount'=>750000,'allocated_amount'=>500000,
+            'method'=>'Virement bancaire','reference'=>'CREDIT-FUTUR-001','type'=>'acompte','notes'=>'Avance pour une future commande',
+        ])->assertRedirect('/modules/paiements');
+
+        $this->assertDatabaseHas('client_payments',['client_id'=>$client->id,'order_id'=>null,'invoice_id'=>null,'amount'=>750000,'allocated_amount'=>0]);
+        $this->assertSame($before+750000,(float)DB::table('clients')->where('id',$client->id)->value('credit_balance'));
+    }
+
+    public function test_manager_can_create_a_client_directly_with_an_unlinked_payment(): void
+    {
+        $this->actingAs($this->manager)->post('/modules/paiements',[
+            'new_client_name'=>'Client paiement comptoir',
+            'new_client_contact'=>'+261 34 00 111 22',
+            'new_client_type'=>'particulier',
+            'new_client_address'=>'Antananarivo',
+            'paid_at'=>'2026-08-27',
+            'amount'=>900000,
+            'allocated_amount'=>0,
+            'method'=>'Espèces',
+            'reference'=>'CREDIT-MANUEL-001',
+            'type'=>'acompte',
+            'notes'=>'Avance pour une future commande',
+        ])->assertRedirect('/modules/paiements');
+
+        $client=DB::table('clients')->where('name','Client paiement comptoir')->first();
+        $this->assertNotNull($client);
+        $this->assertSame(900000.0,(float)$client->credit_balance);
+        $this->assertDatabaseHas('client_payments',[
+            'client_id'=>$client->id,
+            'amount'=>900000,
+            'allocated_amount'=>0,
+            'reference'=>'CREDIT-MANUEL-001',
+        ]);
+    }
+
     public function test_local_sale_decrements_stock_and_records_movement(): void
     {
         $product=DB::table('inventory_products')->where('reference','PRD-001')->first();
