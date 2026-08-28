@@ -36,6 +36,7 @@ class DemoDataSeederTest extends TestCase
         $manager=User::where('email','manager@madina-import.mg')->firstOrFail();
         $this->actingAs($manager)->get('/dashboard')->assertOk();
         $this->actingAs($manager)->get('/modules/clients')->assertInertia(fn(Assert $page)=>$page
+            ->where('config.columns.credit_balance','Solde client')
             ->where('pagination.total',24)
             ->where('pagination.per_page',20)
             ->where('pagination.last_page',2)

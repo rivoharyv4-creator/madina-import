@@ -103,12 +103,13 @@ class ModuleCreationTest extends TestCase
     {
         $client=DB::table('clients')->first(); $suppliers=DB::table('suppliers')->limit(2)->pluck('id')->all();
         $this->actingAs($this->manager)->post('/modules/devis',['client_id'=>$client->id,'valid_until'=>'2026-09-30','status'=>'brouillon','items'=>[
-            ['name'=>'Table restaurant','specifications'=>'Bois clair','quantity'=>5,'supplier_id'=>$suppliers[0],'source_url'=>null,'supplier_price'=>200000,'china_delivery'=>50000,'packaging'=>25000,'weight'=>100,'cbm'=>1.2,'freight'=>300000,'margin'=>400000,'commission'=>100000,'total'=>1875000],
-            ['name'=>'Suspension LED','specifications'=>'Noir mat','quantity'=>10,'supplier_id'=>$suppliers[1],'source_url'=>null,'supplier_price'=>50000,'china_delivery'=>20000,'packaging'=>10000,'weight'=>15,'cbm'=>0.2,'freight'=>80000,'margin'=>200000,'commission'=>50000,'total'=>860000],
+            ['name'=>'Table restaurant','specifications'=>'Bois clair','quantity'=>5,'supplier_id'=>$suppliers[0],'source_url'=>null,'supplier_price'=>200000,'china_delivery'=>50000,'packaging'=>25000,'weight'=>100,'cbm'=>1.2,'freight'=>300000,'margin'=>400000,'commission'=>100000,'total'=>1],
+            ['name'=>'Suspension LED','specifications'=>'Noir mat','quantity'=>10,'supplier_id'=>$suppliers[1],'source_url'=>null,'supplier_price'=>50000,'china_delivery'=>20000,'packaging'=>10000,'weight'=>15,'cbm'=>0.2,'freight'=>80000,'margin'=>200000,'commission'=>50000,'total'=>1],
         ]])->assertRedirect('/modules/devis');
         $quote=DB::table('quotes')->where('number','DV-MI-2026-002')->first();
         $this->assertSame(2,DB::table('quote_items')->where('quote_id',$quote->id)->count());
         $this->assertSame(2735000.0,(float)$quote->total);
+        $this->assertSame([860000.0,1875000.0],DB::table('quote_items')->where('quote_id',$quote->id)->pluck('total')->map(fn($total)=>(float)$total)->sort()->values()->all());
         $this->assertSame(1500000.0,(float)$quote->supplier_estimate);
     }
 

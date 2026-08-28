@@ -58,6 +58,7 @@ class PdfDocumentTest extends TestCase
         $html=view('pdf.document',compact('module','document','items','title','logoData','company'))->render();
 
         $this->assertStringContainsString('Prix unitaire',$html);
+        $this->assertStringContainsString('<tr class="grand"><td>Total</td><td class="value">6.750.000 Ar</td></tr>',$html);
         $this->assertStringContainsString('Lot IIB 106 Ambatomainty Antananarivo',$html);
         $this->assertStringContainsString('+261 34 98 732 08',$html);
         $this->assertStringContainsString('+86 158 0200 3702',$html);
@@ -68,6 +69,7 @@ class PdfDocumentTest extends TestCase
         $this->assertStringNotContainsString('Prix total sans marge',$html);
         $this->assertStringNotContainsString('>Marge<',$html);
         $this->assertStringNotContainsString('Fournisseur :',$html);
+        $this->assertStringNotContainsString('<div class="status">',$html);
     }
 
     public function test_pdf_download_requires_authentication(): void

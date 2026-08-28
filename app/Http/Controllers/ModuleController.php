@@ -27,7 +27,7 @@ class ModuleController extends Controller
     private function config(string $module): array
     {
         return [
-            'clients'=>['title'=>'Clients','table'=>'clients','primary'=>'Nouveau client','editable'=>true,'columns'=>['number'=>'N° client','name'=>'Client','contact'=>'Contact','type'=>'Type','credit_balance'=>'Crédit disponible','active'=>'Statut']],
+            'clients'=>['title'=>'Clients','table'=>'clients','primary'=>'Nouveau client','editable'=>true,'columns'=>['number'=>'N° client','name'=>'Client','contact'=>'Contact','type'=>'Type','credit_balance'=>'Solde client','active'=>'Statut']],
             'devis'=>['title'=>'Devis','table'=>'quotes','primary'=>'Nouveau devis','editable'=>true,'columns'=>['number'=>'N° devis','created_at'=>'Date du devis','client_id'=>'Client','total'=>'Montant','valid_until'=>'Validité','status'=>'Statut']],
             'commandes'=>['title'=>'Commandes','table'=>'orders','primary'=>'Nouvelle commande','editable'=>true,'columns'=>['number'=>'N° commande','client_id'=>'Client','client_total'=>'Total client','ordered_at'=>'Date','status'=>'Statut']],
             'paiements'=>['title'=>'Paiements clients','table'=>'client_payments','primary'=>'Nouveau paiement','editable'=>true,'columns'=>['client_id'=>'Client','paid_at'=>'Date','amount'=>'Montant','method'=>'Mode','status'=>'Statut']],
@@ -256,7 +256,7 @@ class ModuleController extends Controller
     private function createQuote(array $data, NumberSequenceService $numbers): int
     {
         if(empty($data['client_id'])) $data['client_id']=DB::table('clients')->insertGetId(['number'=>$numbers->next('client'),'name'=>$data['client_name'],'contact'=>$data['client_contact'],'type'=>$data['client_type'],'address'=>null,'notes'=>'Créé directement depuis un devis','active'=>true,'credit_balance'=>0,'created_at'=>now(),'updated_at'=>now()]);
-        $client=DB::table('clients')->find($data['client_id']); $supplierTotal=collect($data['items'])->sum(fn($item)=>(float)$item['supplier_price']*(float)$item['quantity']); $logistics=collect($data['items'])->sum(fn($item)=>(float)($item['china_delivery']??0)+(float)($item['packaging']??0)+(float)($item['freight']??0)); $margin=collect($data['items'])->sum(fn($item)=>(float)($item['margin']??0)); $total=collect($data['items'])->sum(fn($item)=>(float)$item['total']);
+        $client=DB::table('clients')->find($data['client_id']); $supplierTotal=collect($data['items'])->sum(fn($item)=>(float)$item['supplier_price']*(float)$item['quantity']); $logistics=collect($data['items'])->sum(fn($item)=>(float)($item['china_delivery']??0)+(float)($item['packaging']??0)+(float)($item['freight']??0)); $margin=collect($data['items'])->sum(fn($item)=>(float)($item['margin']??0)); $total=collect($data['items'])->sum(fn($item)=>$this->quoteItemSalePrice($item));
         $id=DB::table('quotes')->insertGetId(['number'=>$numbers->next('quote'),'client_id'=>$client->id,'client_name'=>$data['client_name'],'contact'=>$data['client_contact'],'client_type'=>$client->type,'sent_at'=>$data['status']==='brouillon'?null:today(),'valid_until'=>$data['valid_until'],'shipping_mode'=>$data['shipping_mode'],'shipping_delay'=>$data['shipping_delay']??null,'bank_details'=>$data['bank_details']??null,'payment_terms'=>$data['payment_terms']??null,'warranty'=>$data['warranty']??null,'status'=>$data['status'],'supplier_estimate'=>$supplierTotal,'logistics_estimate'=>$logistics,'margin'=>$margin,'total'=>$total,'currency'=>'MGA','notes'=>$data['notes']??null,'created_at'=>now(),'updated_at'=>now()]);
         $this->insertQuoteItems($id,$data['items']);
         return $id;
@@ -283,8 +283,18 @@ class ModuleController extends Controller
         foreach($items as $item) {
             $photo=$item['photo']??null; $existing=$existingPhotos[$item['id']??0]??null;
             $supplier=!empty($item['supplier_id'])?DB::table('suppliers')->find($item['supplier_id']):null;
-            DB::table('quote_items')->insert(['quote_id'=>$quoteId,'supplier_id'=>$item['supplier_id']??null,'supplier_name'=>$item['supplier_name']??$supplier?->name,'supplier_contact'=>$item['supplier_contact']??$supplier?->contact,'name'=>$item['name'],'specifications'=>$item['specifications']??null,'quantity'=>$item['quantity'],'source_url'=>$item['source_url']??null,'photo_path'=>$photo?$this->storePhoto($photo):$existing,'supplier_price'=>$item['supplier_price'],'china_delivery'=>$item['china_delivery']??0,'packaging'=>$item['packaging']??0,'estimated_weight'=>$item['weight']??null,'estimated_cbm'=>$item['cbm']??null,'estimated_freight'=>$item['freight']??0,'margin'=>$item['margin']??0,'commission'=>$item['commission']??0,'total'=>$item['total'],'created_at'=>now(),'updated_at'=>now()]);
+            DB::table('quote_items')->insert(['quote_id'=>$quoteId,'supplier_id'=>$item['supplier_id']??null,'supplier_name'=>$item['supplier_name']??$supplier?->name,'supplier_contact'=>$item['supplier_contact']??$supplier?->contact,'name'=>$item['name'],'specifications'=>$item['specifications']??null,'quantity'=>$item['quantity'],'source_url'=>$item['source_url']??null,'photo_path'=>$photo?$this->storePhoto($photo):$existing,'supplier_price'=>$item['supplier_price'],'china_delivery'=>$item['china_delivery']??0,'packaging'=>$item['packaging']??0,'estimated_weight'=>$item['weight']??null,'estimated_cbm'=>$item['cbm']??null,'estimated_freight'=>$item['freight']??0,'margin'=>$item['margin']??0,'commission'=>$item['commission']??0,'total'=>$this->quoteItemSalePrice($item),'created_at'=>now(),'updated_at'=>now()]);
         }
+    }
+
+    private function quoteItemSalePrice(array $item): float
+    {
+        return (float)$item['supplier_price']*(float)$item['quantity']
+            +(float)($item['china_delivery']??0)
+            +(float)($item['packaging']??0)
+            +(float)($item['freight']??0)
+            +(float)($item['margin']??0)
+            +(float)($item['commission']??0);
     }
 
     private function insertOrderItems(int $orderId, array $items, bool $commissionEnabled, string $status, array $existingPhotos=[]): array
@@ -390,7 +400,7 @@ class ModuleController extends Controller
         if(in_array($module,['clients','logistique','depenses','employes'],true)) { DB::table($this->config($module)['table'])->where('id',$id)->update([...$data,'updated_at'=>now()]); return; }
         if($module==='stock') { $photo=$data['photo']??null; unset($data['photo']); $before=(float)$old->quantity; $after=(float)$data['quantity']; DB::table('inventory_products')->where('id',$id)->update([...$data,'photo_path'=>$photo?$this->storePhoto($photo):$old->photo_path,'stock_value'=>$after*(float)$data['purchase_price'],'entered_at'=>$after>$before?today():$old->entered_at,'exited_at'=>$after<$before?today():$old->exited_at,'updated_at'=>now()]); if($after!==$before) DB::table('stock_movements')->insert(['inventory_product_id'=>$id,'type'=>'inventaire','quantity'=>abs($after-$before),'before_quantity'=>$before,'after_quantity'=>$after,'notes'=>'Correction manuelle auditée','moved_at'=>now(),'user_id'=>$userId]); return; }
         if($module==='devis') {
-            $client=DB::table('clients')->find($data['client_id']); $supplierTotal=collect($data['items'])->sum(fn($item)=>(float)$item['supplier_price']*(float)$item['quantity']); $logistics=collect($data['items'])->sum(fn($item)=>(float)($item['china_delivery']??0)+(float)($item['packaging']??0)+(float)($item['freight']??0)); $margin=collect($data['items'])->sum(fn($item)=>(float)($item['margin']??0)); $total=collect($data['items'])->sum(fn($item)=>(float)$item['total']);
+            $client=DB::table('clients')->find($data['client_id']); $supplierTotal=collect($data['items'])->sum(fn($item)=>(float)$item['supplier_price']*(float)$item['quantity']); $logistics=collect($data['items'])->sum(fn($item)=>(float)($item['china_delivery']??0)+(float)($item['packaging']??0)+(float)($item['freight']??0)); $margin=collect($data['items'])->sum(fn($item)=>(float)($item['margin']??0)); $total=collect($data['items'])->sum(fn($item)=>$this->quoteItemSalePrice($item));
             DB::table('quotes')->where('id',$id)->update(['client_id'=>$client->id,'client_name'=>$data['client_name'],'contact'=>$data['client_contact'],'client_type'=>$client->type,'sent_at'=>$data['status']==='brouillon'?null:($old->sent_at??today()),'valid_until'=>$data['valid_until'],'shipping_mode'=>$data['shipping_mode'],'shipping_delay'=>$data['shipping_delay']??null,'bank_details'=>$data['bank_details']??null,'payment_terms'=>$data['payment_terms']??null,'warranty'=>$data['warranty']??null,'notes'=>$data['notes']??null,'status'=>$data['status'],'supplier_estimate'=>$supplierTotal,'logistics_estimate'=>$logistics,'margin'=>$margin,'total'=>$total,'updated_at'=>now()]);
             $photos=DB::table('quote_items')->where('quote_id',$id)->pluck('photo_path','id')->all(); DB::table('quote_items')->where('quote_id',$id)->delete(); $this->insertQuoteItems($id,$data['items'],$photos); return;
         }
@@ -521,7 +531,7 @@ class ModuleController extends Controller
         $base=[['name'=>'name','label'=>'Nom du produit / article','type'=>'text','required'=>true]];
         $base[]=['name'=>'photo','label'=>$module==='devis'?'Photo du produit sur le devis':'Photo réelle du produit','type'=>'file','required'=>false];
         $base=[...$base,['name'=>'specifications','label'=>'Spécifications','type'=>'textarea','required'=>false],['name'=>'quantity','label'=>'Quantité','type'=>'number','required'=>true],['name'=>'supplier_id','label'=>'Sélectionner un fournisseur','type'=>'select','required'=>false,'options'=>$suppliers],['name'=>'supplier_name','label'=>'Nom du fournisseur (saisie manuelle)','type'=>'text','required'=>false],['name'=>'supplier_contact','label'=>'Contact fournisseur','type'=>'text','required'=>false],['name'=>'source_url','label'=>'Lien 1688 / Taobao','type'=>'url','required'=>false],['name'=>'supplier_price','label'=>'Prix fournisseur unitaire (Ar)','type'=>'number','required'=>true],['name'=>'china_delivery','label'=>'Livraison locale Chine (Ar)','type'=>'number','required'=>false],['name'=>'packaging','label'=>'Emballage (Ar)','type'=>'number','required'=>false],['name'=>'weight','label'=>'Poids estimé (kg)','type'=>'number','required'=>false],['name'=>'cbm','label'=>'CBM estimé','type'=>'number','required'=>false],['name'=>'freight','label'=>'Fret (Ar)','type'=>'number','required'=>false],['name'=>'margin','label'=>'Marge (Ar)','type'=>'number','required'=>false],['name'=>'commission','label'=>'Commission (Ar)','type'=>'number','required'=>false]];
-        return [...$base,['name'=>$module==='devis'?'total':'client_total','label'=>$module==='devis'?'Total estimé de la ligne (Ar)':'Prix final client de la ligne (Ar)','type'=>'number','required'=>true]];
+        return [...$base,['name'=>$module==='devis'?'total':'client_total','label'=>$module==='devis'?'Prix de vente / Total de la ligne (Ar)':'Prix final client de la ligne (Ar)','type'=>'number','required'=>true]];
     }
 
     private function emptyItem(string $module): array
