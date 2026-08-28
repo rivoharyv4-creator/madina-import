@@ -58,6 +58,8 @@ class PdfDocumentTest extends TestCase
         $html=view('pdf.document',compact('module','document','items','title','logoData','company'))->render();
 
         $this->assertStringContainsString('Prix unitaire',$html);
+        $this->assertStringContainsString('Prix de vente',$html);
+        $this->assertStringContainsString('3.700.000 Ar',$html);
         $this->assertStringContainsString('<tr class="grand"><td>Total</td><td class="value">6.750.000 Ar</td></tr>',$html);
         $this->assertStringContainsString('Lot IIB 106 Ambatomainty Antananarivo',$html);
         $this->assertStringContainsString('+261 34 98 732 08',$html);

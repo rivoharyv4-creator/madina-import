@@ -55,14 +55,14 @@
     </table>
 
     <table class="lines">
-        <thead><tr><th>Désignation</th><th class="qty">Quantité</th><th class="amount">Prix unitaire</th><th class="amount">Montant</th></tr></thead>
+        <thead><tr><th>Désignation</th><th class="qty">Quantité</th><th class="amount">Prix unitaire</th><th class="amount">{{ $module==='devis'?'Prix de vente':'Montant' }}</th></tr></thead>
         <tbody>
         @foreach($items as $item)
             <tr>
                 <td>@if($module==='devis' && $item->photo_data)<img class="product-photo" src="{{ $item->photo_data }}" alt="">@endif<strong>{{ $module==='devis'?$item->name:$item->label }}</strong>@if($module==='devis' && $item->specifications)<div class="description">{{ $item->specifications }}</div>@endif</td>
                 @php($quantity=(float)($item->quantity??1))
                 @php($amount=(float)($module==='devis'?$item->total:$item->amount))
-                @php($unitPrice=isset($item->unit_price)?(float)$item->unit_price:($quantity>0?$amount/$quantity:0))
+                @php($unitPrice=$module==='devis'?(float)$item->supplier_price:(isset($item->unit_price)?(float)$item->unit_price:($quantity>0?$amount/$quantity:0)))
                 <td class="qty">{{ rtrim(rtrim(number_format($quantity,3,',',' '),'0'),',') }}</td>
                 <td class="amount">{{ number_format($unitPrice,0,',','.') }} Ar</td>
                 <td class="amount">{{ number_format($amount,0,',','.') }} Ar</td>
