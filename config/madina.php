@@ -18,7 +18,7 @@ return [
         'whatsapp' => env('PUBLIC_WHATSAPP', '+261349873208'),
         'facebook_url' => env('PUBLIC_FACEBOOK_URL', 'https://www.facebook.com/profile.php?id=61553409549693'),
     ],
-    'admin_login_path' => env('ADMIN_LOGIN_PATH', 'gestion-privee'),
+    'admin_login_path' => env('ADMIN_LOGIN_PATH', 'madina-gestion-e2e26c5871bf4033b6ee1a4769e47ff7'),
     'backup_path' => env('BACKUP_PATH') ?: storage_path('app/backups'),
     'backup_retention_days' => (int) env('BACKUP_RETENTION_DAYS', 14),
     'persistent_directories' => [

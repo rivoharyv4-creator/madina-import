@@ -10,10 +10,10 @@ use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use Illuminate\Support\Facades\Route;
 
-$adminLoginPath = trim((string) config('madina.admin_login_path', 'gestion-privee'), '/');
+$adminLoginPath = trim((string) config('madina.admin_login_path', 'madina-gestion-e2e26c5871bf4033b6ee1a4769e47ff7'), '/');
 
 if ($adminLoginPath === '') {
-    $adminLoginPath = 'gestion-privee';
+    $adminLoginPath = 'madina-gestion-e2e26c5871bf4033b6ee1a4769e47ff7';
 }
 
 Route::middleware('guest')->group(function () use ($adminLoginPath) {
