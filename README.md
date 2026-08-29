@@ -28,6 +28,8 @@ SQLite doit rester réservé au développement local : le système de fichiers d
 
 La commande de déploiement doit utiliser uniquement `php artisan migrate --force`. Ne jamais exécuter `migrate:fresh`, `db:wipe` ou `db:seed` automatiquement en production. Les migrations normales conservent les enregistrements existants. Les fichiers téléversés doivent être placés dans Laravel Object Storage plutôt que sur le disque local de l’instance.
 
+Lors du premier déploiement sur une base vide, la migration de démarrage crée automatiquement le super administrateur à partir de `ADMIN_EMAIL` et `ADMIN_PASSWORD`. Si ces variables ne sont pas encore définies, un identifiant de récupération fort, conservé uniquement sous forme de hash dans le dépôt, est utilisé temporairement et doit être changé immédiatement après la première connexion. L’URL privée est `/{ADMIN_LOGIN_PATH}`, ou `/gestion-privee` si cette variable est absente.
+
 ## Architecture de données
 
 La migration métier couvre les séquences annuelles atomiques, clients, fournisseurs et catalogue, devis et lignes, commandes et lignes, factures, paiements clients, paiements fournisseurs multi-commandes, expéditions, stock et mouvements, inventaires mensuels, ventes locales, dépenses, employés, salaires, fiscalité, documents privés et journal d’audit. Tous les montants utilisent `DECIMAL`.
