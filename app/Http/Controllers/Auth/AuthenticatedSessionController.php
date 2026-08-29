@@ -33,7 +33,11 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        $user=$request->user();
+        $firstPermission=collect(array_keys(config('access.menus',[])))->first(fn($menu)=>$user->canAccessModule($menu));
+        $destination=(!$firstPermission||$firstPermission==='dashboard')?route('dashboard',absolute:false):'/modules/'.$firstPermission;
+
+        return redirect()->intended($destination);
     }
 
     /**

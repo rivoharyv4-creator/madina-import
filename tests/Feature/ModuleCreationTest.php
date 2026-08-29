@@ -251,6 +251,34 @@ class ModuleCreationTest extends TestCase
         $this->assertSame(3,DB::table('order_package_items')->join('order_packages','order_packages.id','=','order_package_items.order_package_id')->where('order_packages.order_id',$order->id)->count());
     }
 
+    public function test_stock_flow_calculates_availability_costs_sales_and_order_origins(): void
+    {
+        $orders=DB::table('orders')->limit(2)->pluck('id')->all();
+        $this->actingAs($this->manager)->get('/modules/stock/create')->assertInertia(fn(Assert $page)=>$page
+            ->where('module','stock')
+            ->where('fields',fn($fields)=>collect($fields)->contains(fn($field)=>$field['name']==='available_quantity'&&$field['readOnly']===true)
+                &&collect($fields)->contains(fn($field)=>$field['name']==='total_purchase_cost'&&$field['readOnly']===true)
+                &&collect($fields)->contains(fn($field)=>$field['name']==='sale_total'&&$field['readOnly']===true)
+                &&collect($fields)->contains(fn($field)=>$field['name']==='origin_order_ids'&&$field['type']==='multiselect'))
+        );
+
+        $this->actingAs($this->manager)->post('/modules/stock',[
+            'reference'=>'SKU-STOCK-FLOW-001','name'=>'Produit flux stock','quantity'=>20,'reserved_quantity'=>6,
+            'purchase_price'=>100000,'cbm'=>1.25,'freight'=>400000,'sale_price'=>175000,'origin_order_ids'=>$orders,
+        ])->assertRedirect('/modules/stock');
+
+        $product=DB::table('inventory_products')->where('reference','SKU-STOCK-FLOW-001')->first();
+        $this->assertSame(14.0,(float)$product->available_quantity);
+        $this->assertSame(2400000.0,(float)$product->total_purchase_cost);
+        $this->assertSame(3500000.0,(float)$product->sale_total);
+        $this->assertSame(2,DB::table('inventory_product_origins')->where('inventory_product_id',$product->id)->count());
+
+        $this->actingAs($this->manager)->post('/modules/stock',[
+            'reference'=>'SKU-STOCK-FLOW-INVALID','name'=>'Réservation invalide','quantity'=>2,'reserved_quantity'=>3,
+            'purchase_price'=>1000,'freight'=>0,'sale_price'=>2000,
+        ])->assertSessionHasErrors('reserved_quantity');
+    }
+
     public function test_quotes_accept_product_photos_while_invoice_and_tracking_receive_real_order_products(): void
     {
         $order=DB::table('orders')->first(); $item=DB::table('order_items')->where('order_id',$order->id)->first();
@@ -260,6 +288,69 @@ class ModuleCreationTest extends TestCase
         foreach(['factures','logistique'] as $module) {
             $this->actingAs($this->manager)->get("/modules/{$module}/create")->assertInertia(fn(Assert $page)=>$page->where('module',$module)->where('orderProducts',fn($groups)=>collect($groups[$order->id]??[])->contains(fn($product)=>$product['photo_url']==='/product-photo/real-item.jpg')));
         }
+    }
+
+    public function test_logistics_tracking_follows_the_internal_management_flow(): void
+    {
+        $order=DB::table('orders')->first();
+
+        $this->actingAs($this->manager)->get('/modules/logistique/create')->assertInertia(fn(Assert $page)=>$page
+            ->where('module','logistique')
+            ->where('fields',fn($fields)=>collect($fields)->pluck('section')->filter()->unique()->values()->all()===[
+                '1. Liaison','2. Statut','3. Suivi','4. Dates','5. Volume','6. Coût',
+            ])
+            ->has("orderTemplates.{$order->id}")
+        );
+
+        $this->actingAs($this->manager)->post('/modules/logistique',[
+            'order_id'=>$order->id,
+            'status'=>'expedie',
+            'tracking'=>'TRACK-MI-2026-TEST',
+            'forwarder'=>'SinoMada Test',
+            'container_reference'=>'CONT-MG-001',
+            'china_departure_at'=>'2026-08-20',
+            'china_warehouse_at'=>'2026-08-18',
+            'expected_madagascar_at'=>'2026-09-25',
+            'arrived_madagascar_at'=>null,
+            'cbm'=>4.25,
+            'package_count'=>12,
+            'carton_count'=>30,
+            'cost'=>2000000,
+        ])->assertRedirect('/modules/logistique');
+
+        $shipment=DB::table('shipments')->where('tracking','TRACK-MI-2026-TEST')->first();
+        $this->assertNotNull($shipment);
+        $this->assertSame('maritime',$shipment->mode);
+        $this->assertSame('CONT-MG-001',$shipment->container_reference);
+        $this->assertSame(12,$shipment->package_count);
+        $this->assertSame(30,$shipment->carton_count);
+        $this->assertSame(2000000.0,(float)$shipment->cost);
+
+        $this->actingAs($this->manager)->get("/modules/logistique/{$shipment->id}")->assertInertia(fn(Assert $page)=>$page
+            ->component('Module/ShipmentShow')
+            ->where('shipment.order_number',$order->number)
+            ->where('shipment.container_reference','CONT-MG-001')
+            ->where('shipment.package_count',12)
+            ->has('products')
+        );
+
+        $this->actingAs($this->manager)->put("/modules/logistique/{$shipment->id}",[
+            'order_id'=>$order->id,
+            'status'=>'en_transit',
+            'tracking'=>'TRACK-MI-2026-TEST',
+            'forwarder'=>'SinoMada Test',
+            'container_reference'=>'CONT-MG-001-B',
+            'china_departure_at'=>'2026-08-20',
+            'china_warehouse_at'=>'2026-08-18',
+            'expected_madagascar_at'=>'2026-09-25',
+            'arrived_madagascar_at'=>null,
+            'cbm'=>4.5,
+            'package_count'=>13,
+            'carton_count'=>32,
+            'cost'=>2100000,
+        ])->assertRedirect('/modules/logistique');
+
+        $this->assertDatabaseHas('shipments',['id'=>$shipment->id,'status'=>'en_transit','container_reference'=>'CONT-MG-001-B','package_count'=>13,'carton_count'=>32]);
     }
 
     public function test_manager_can_preview_an_order_with_products_photos_and_packages(): void
@@ -319,6 +410,35 @@ class ModuleCreationTest extends TestCase
         $supplier=DB::table('suppliers')->where('name','Catalogue fournisseur test')->first();
         $this->assertDatabaseHas('supplier_products',['supplier_id'=>$supplier->id,'name'=>'Assiette premium','price'=>12000]);
         $this->actingAs($this->manager)->get("/modules/fournisseurs/{$supplier->id}/edit")->assertInertia(fn(Assert $page)=>$page->where('initialSupplierProducts.0.name','Assiette premium'));
+    }
+
+    public function test_catalogue_management_is_separated_from_stock(): void
+    {
+        $product=DB::table('inventory_products')->first();
+
+        $this->actingAs($this->manager)->get("/modules/stock/{$product->id}/edit")->assertInertia(fn(Assert $page)=>$page
+            ->where('module','stock')
+            ->where('fields',fn($fields)=>!collect($fields)->contains(fn($field)=>in_array($field['name'],['slug','gallery','category','short_description','catalog_description','is_published','is_featured','show_price'],true)))
+        );
+
+        $this->actingAs($this->manager)->get('/modules/catalogue')->assertInertia(fn(Assert $page)=>$page
+            ->where('module','catalogue')
+            ->where('config.title','Catalogue')
+        );
+
+        $this->actingAs($this->manager)->get("/modules/catalogue/{$product->id}/edit")->assertInertia(fn(Assert $page)=>$page
+            ->where('module','catalogue')
+            ->where('fields',fn($fields)=>collect($fields)->contains(fn($field)=>$field['name']==='catalog_description'))
+        );
+
+        $this->actingAs($this->manager)->put("/modules/catalogue/{$product->id}",[
+            'slug'=>'produit-catalogue-separe','category'=>'Maison','short_description'=>'Description courte','catalog_description'=>'Description complète du catalogue',
+            'is_published'=>1,'is_featured'=>1,'show_price'=>1,
+        ])->assertRedirect('/modules/catalogue');
+
+        $this->assertDatabaseHas('inventory_products',[
+            'id'=>$product->id,'slug'=>'produit-catalogue-separe','category'=>'Maison','is_published'=>1,'is_featured'=>1,'show_price'=>1,
+        ]);
     }
 
     public function test_expense_can_be_general_or_linked_to_an_order(): void

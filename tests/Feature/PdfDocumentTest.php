@@ -77,7 +77,7 @@ class PdfDocumentTest extends TestCase
     public function test_pdf_download_requires_authentication(): void
     {
         $quoteId=DB::table('quotes')->value('id');
-        $this->get("/modules/devis/{$quoteId}/pdf")->assertRedirect('/login');
+        $this->get("/modules/devis/{$quoteId}/pdf")->assertNotFound();
     }
 
     public function test_manager_can_download_a_payment_receipt_as_client_proof(): void
@@ -96,6 +96,6 @@ class PdfDocumentTest extends TestCase
     public function test_payment_receipt_requires_authentication(): void
     {
         $paymentId=DB::table('client_payments')->value('id');
-        $this->get("/modules/paiements/{$paymentId}/recu")->assertRedirect('/login');
+        $this->get("/modules/paiements/{$paymentId}/recu")->assertNotFound();
     }
 }

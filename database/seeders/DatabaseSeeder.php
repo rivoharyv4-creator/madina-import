@@ -23,6 +23,9 @@ class DatabaseSeeder extends Seeder
             'name' => 'Manager Madina',
             'password' => Hash::make(env('ADMIN_PASSWORD', 'ChangeMe!2026')),
             'email_verified_at' => now(),
+            'role' => 'super_admin',
+            'permissions' => array_keys(config('access.menus', [])),
+            'active' => true,
         ]);
 
         DB::transaction(function () use ($manager): void {
@@ -111,7 +114,7 @@ class DatabaseSeeder extends Seeder
                 ['reference'=>'PRD-003','name'=>'Robinet mitigeur noir','quantity'=>0,'purchase_price'=>95000,'sale_price'=>165000,'stock_value'=>0,'entered_at'=>$now->copy()->subMonths(3)->toDateString(),'exited_at'=>$now->copy()->subDays(1)->toDateString(),'alert_threshold'=>3],
                 ['reference'=>'PRD-004','name'=>'Étagère métallique 5 niveaux','quantity'=>12,'purchase_price'=>145000,'sale_price'=>245000,'stock_value'=>1740000,'entered_at'=>$now->copy()->subDays(20)->toDateString(),'exited_at'=>null,'alert_threshold'=>4],
             ];
-            foreach($stock as &$product){$product['created_at']=$now;$product['updated_at']=$now;}
+            foreach($stock as &$product){$product['reserved_quantity']=0;$product['available_quantity']=$product['quantity'];$product['cbm']=null;$product['freight']=0;$product['total_purchase_cost']=$product['quantity']*$product['purchase_price'];$product['sale_total']=$product['quantity']*$product['sale_price'];$product['created_at']=$now;$product['updated_at']=$now;}
             unset($product);
             DB::table('inventory_products')->upsert($stock,['reference'],array_keys($stock[0]));
             $productIds=DB::table('inventory_products')->pluck('id','reference');

@@ -14,6 +14,9 @@ class ManagerSeeder extends Seeder
             'name'=>'Manager Madina',
             'password'=>Hash::make(env('ADMIN_PASSWORD','ChangeMe!2026')),
             'email_verified_at'=>now(),
+            'role'=>'super_admin',
+            'permissions'=>array_keys(config('access.menus',[])),
+            'active'=>true,
         ]);
     }
 }

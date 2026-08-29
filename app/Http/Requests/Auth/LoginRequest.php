@@ -42,11 +42,11 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
+        if (! Auth::attempt([...$this->only('email', 'password'), 'active' => true], $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
-                'email' => trans('auth.failed'),
+                'email' => 'Identifiants incorrects ou accès indisponible. Vérifiez vos informations et réessayez.',
             ]);
         }
 
@@ -69,10 +69,7 @@ class LoginRequest extends FormRequest
         $seconds = RateLimiter::availableIn($this->throttleKey());
 
         throw ValidationException::withMessages([
-            'email' => trans('auth.throttle', [
-                'seconds' => $seconds,
-                'minutes' => ceil($seconds / 60),
-            ]),
+            'email' => "Trop de tentatives de connexion. Réessayez dans {$seconds} secondes.",
         ]);
     }
 

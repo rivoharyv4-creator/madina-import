@@ -3,6 +3,9 @@ export interface User {
     name: string;
     email: string;
     email_verified_at?: string;
+    role: 'super_admin'|'assistant'|'user';
+    permissions: string[];
+    active: boolean;
 }
 
 export type PageProps<

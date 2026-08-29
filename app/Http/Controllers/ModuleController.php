@@ -13,6 +13,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Excel as ExcelFormat;
@@ -27,6 +28,7 @@ class ModuleController extends Controller
     private function config(string $module): array
     {
         return [
+            'demandes-devis'=>['title'=>'Demandes de devis','table'=>'quote_requests','primary'=>'Nouvelle demande','editable'=>true,'columns'=>['request_date'=>'Date','client_name'=>'Client','client_contact'=>'Contact','source'=>'Source','quantity'=>'Quantité','budget'=>'Budget indicatif','shipping_mode'=>'Livraison','status'=>'Statut','assigned_to'=>'Assigné à','quote_id'=>'Devis lié']],
             'clients'=>['title'=>'Clients','table'=>'clients','primary'=>'Nouveau client','editable'=>true,'columns'=>['number'=>'N° client','name'=>'Client','contact'=>'Contact','type'=>'Type','credit_balance'=>'Solde client','active'=>'Statut']],
             'devis'=>['title'=>'Devis','table'=>'quotes','primary'=>'Nouveau devis','editable'=>true,'columns'=>['number'=>'N° devis','created_at'=>'Date du devis','client_id'=>'Client','total'=>'Montant','valid_until'=>'Validité','status'=>'Statut']],
             'commandes'=>['title'=>'Commandes','table'=>'orders','primary'=>'Nouvelle commande','editable'=>true,'columns'=>['number'=>'N° commande','client_id'=>'Client','client_total'=>'Total client','ordered_at'=>'Date','status'=>'Statut']],
@@ -34,8 +36,10 @@ class ModuleController extends Controller
             'factures'=>['title'=>'Factures','table'=>'invoices','primary'=>'Nouvelle facture','editable'=>true,'columns'=>['number'=>'N° facture','type'=>'Type','subtotal'=>'Total','issued_at'=>'Date','status'=>'Statut']],
             'fournisseurs'=>['title'=>'Fournisseurs','table'=>'suppliers','primary'=>'Nouveau fournisseur','editable'=>true,'columns'=>['name'=>'Fournisseur','category'=>'Catégorie','contact'=>'Contact','quality_rating'=>'Qualité','active'=>'Statut']],
             'achats'=>['title'=>'Achats fournisseurs','table'=>'supplier_payments','primary'=>'Nouveau paiement','editable'=>true,'columns'=>['supplier_id'=>'Fournisseur','paid_at'=>'Date','amount'=>'Montant','method'=>'Mode','proof_path'=>'Justificatif','status'=>'Statut']],
-            'logistique'=>['title'=>'Logistique','table'=>'shipments','primary'=>'Nouvelle expédition','editable'=>true,'columns'=>['order_id'=>'Commande','tracking'=>'Tracking','mode'=>'Mode','expected_madagascar_at'=>'Arrivée prévue','status'=>'Statut']],
-            'stock'=>['title'=>'Stock','table'=>'inventory_products','primary'=>'Ajouter un produit','editable'=>true,'columns'=>['photo_path'=>'Photo','reference'=>'Référence','name'=>'Produit','quantity'=>'Quantité','purchase_price'=>'Prix achat','stock_value'=>'Valeur stock']],
+            'logistique'=>['title'=>'Suivi Logistique','table'=>'shipments','primary'=>'Nouveau suivi logistique','editable'=>true,'columns'=>['order_id'=>'N° commande','tracking'=>'Tracking number','forwarder'=>'Transitaire','container_reference'=>'Référence conteneur','expected_madagascar_at'=>'Arrivage prévu','cbm'=>'CBM / volume','package_count'=>'Colis','carton_count'=>'Cartons','cost'=>'Frais de fret','status'=>'Statut']],
+            'stock'=>['title'=>'Stock','table'=>'inventory_products','primary'=>'Ajouter un produit','editable'=>true,'columns'=>['photo_path'=>'Photo','reference'=>'SKU','name'=>'Produit','quantity'=>'Stock','reserved_quantity'=>'Réservée','available_quantity'=>'Disponible','total_purchase_cost'=>'Coût total','sale_total'=>'Valeur de vente']],
+            'catalogue'=>['title'=>'Catalogue','table'=>'inventory_products','primary'=>null,'editable'=>true,'columns'=>['photo_path'=>'Photo','reference'=>'SKU','name'=>'Produit','category'=>'Catégorie','is_published'=>'Publication','is_featured'=>'Mise en avant','show_price'=>'Prix visible']],
+            'demandes'=>['title'=>'Demandes publiques','table'=>'contact_requests','primary'=>null,'editable'=>false,'columns'=>['name'=>'Nom','contact'=>'Contact','need'=>'Besoin','message'=>'Message','status'=>'Statut','created_at'=>'Reçue le']],
             'ventes'=>['title'=>'Ventes locales','table'=>'local_sales','primary'=>'Nouvelle vente','editable'=>true,'columns'=>['inventory_product_id'=>'Produit','sold_at'=>'Date','quantity'=>'Quantité','total'=>'Total','status'=>'Statut']],
             'depenses'=>['title'=>'Dépenses','table'=>'expenses','primary'=>'Nouvelle dépense','editable'=>true,'columns'=>['spent_at'=>'Date','category'=>'Catégorie','description'=>'Description','type'=>'Type','amount'=>'Montant']],
             'salaires'=>['title'=>'Salaires et IRSA','table'=>'salaries','primary'=>'Préparer un salaire','editable'=>true,'related_action'=>['label'=>'Gérer les employés','href'=>'/modules/employes'],'columns'=>['employee_id'=>'Employé','month'=>'Mois','gross_salary'=>'Brut','irsa_amount'=>'IRSA','net_salary'=>'Net']],
@@ -70,8 +74,14 @@ class ModuleController extends Controller
     {
         $config=$this->config($module); abort_if(!$config['primary'],404);
         $prefill=$this->invoicePrefill($module,$request->integer('order_id'));
-        if($module==='devis') $prefill['quote_date']=$this->quoteDate();
-        return Inertia::render('Module/Form',['module'=>$module,'config'=>$config,'fields'=>$this->fields($module),'prefill'=>$prefill,'itemFields'=>$this->itemFields($module),'initialItems'=>$this->itemFields($module)?[$this->emptyItem($module)]:[],'initialPackages'=>[],'initialSupplierProducts'=>$module==='fournisseurs'?[]:null,'orderProducts'=>$this->orderProducts($module),'orderTemplates'=>$this->orderTemplates($module),'quoteTemplates'=>$this->quoteTemplates($module),'company'=>config('madina.company')]);
+        $initialItems=$this->itemFields($module)?[$this->emptyItem($module)]:[];
+        if($module==='devis') {
+            $prefill['quote_date']=$this->quoteDate();
+            [$requestPrefill,$requestItem]=$this->quoteRequestPrefill($request->integer('quote_request_id'));
+            $prefill=[...$prefill,...$requestPrefill];
+            if($requestItem) $initialItems=[$requestItem];
+        }
+        return Inertia::render('Module/Form',['module'=>$module,'config'=>$config,'fields'=>$this->fields($module),'prefill'=>$prefill,'itemFields'=>$this->itemFields($module),'initialItems'=>$initialItems,'initialPackages'=>[],'initialSupplierProducts'=>$module==='fournisseurs'?[]:null,'orderProducts'=>$this->orderProducts($module),'orderTemplates'=>$this->orderTemplates($module),'quoteTemplates'=>$this->quoteTemplates($module),'company'=>config('madina.company')]);
     }
 
     public function edit(string $module, int $id)
@@ -84,7 +94,8 @@ class ModuleController extends Controller
 
     public function show(string $module, int $id)
     {
-        abort_unless($module === 'commandes', 404);
+        if($module==='logistique') return $this->showShipment($id);
+        abort_unless($module==='commandes',404);
 
         $order=DB::table('orders')
             ->join('clients','clients.id','=','orders.client_id')
@@ -113,7 +124,29 @@ class ModuleController extends Controller
             return [...(array)$package,'items'=>$contents];
         })->values();
 
+        $order->public_tracking_url=$order->public_tracking_code?route('public.tracking.link',$order->public_tracking_code):null;
+
         return Inertia::render('Module/OrderShow',['order'=>$order,'items'=>$items,'packages'=>$packages,'company'=>config('madina.company')]);
+    }
+
+    private function showShipment(int $id)
+    {
+        $shipment=DB::table('shipments')
+            ->join('orders','orders.id','=','shipments.order_id')
+            ->join('clients','clients.id','=','orders.client_id')
+            ->where('shipments.id',$id)
+            ->select('shipments.*','orders.number as order_number','clients.name as client_name')
+            ->first();
+        abort_unless($shipment,404);
+
+        $products=DB::table('order_items')
+            ->where('order_id',$shipment->order_id)
+            ->orderBy('id')
+            ->get(['name','specifications','quantity','photo_path'])
+            ->map(fn($item)=>[...(array)$item,'photo_url'=>$item->photo_path?'/product-photo/'.basename($item->photo_path):null])
+            ->values();
+
+        return Inertia::render('Module/ShipmentShow',['shipment'=>$shipment,'products'=>$products]);
     }
 
     public function pdf(string $module, int $id)
@@ -208,12 +241,13 @@ class ModuleController extends Controller
                 'clients'=>DB::table('clients')->insertGetId([...$data,'number'=>$numbers->next('client'),'active'=>$data['active']??true,'credit_balance'=>0,'created_at'=>$now,'updated_at'=>$now]),
                 'fournisseurs'=>$this->createSupplier($data),
                 'stock'=>$this->createStock($data,$numbers,$request->user()->id),
+                'demandes-devis'=>DB::table('quote_requests')->insertGetId([...$data,'quote_id'=>null,'created_at'=>$now,'updated_at'=>$now]),
                 'devis'=>$this->createQuote($data,$numbers),
                 'commandes'=>$this->createOrder($data,$numbers,$request->user()->id),
                 'paiements'=>$this->createClientPayment($data,$numbers),
                 'factures'=>$this->createInvoice($data,$numbers),
                 'achats'=>$this->createSupplierPayment($data),
-                'logistique'=>DB::table('shipments')->insertGetId([...$data,'created_at'=>$now,'updated_at'=>$now]),
+                'logistique'=>DB::table('shipments')->insertGetId([...$data,'mode'=>'maritime','created_at'=>$now,'updated_at'=>$now]),
                 'ventes'=>$this->createLocalSale($data,$request->user()->id),
                 'depenses'=>DB::table('expenses')->insertGetId([...$data,'source_type'=>null,'source_id'=>null,'created_at'=>$now,'updated_at'=>$now]),
                 'employes'=>DB::table('employees')->insertGetId([...$data,'active'=>$data['active']??true,'created_at'=>$now,'updated_at'=>$now]),
@@ -221,6 +255,7 @@ class ModuleController extends Controller
                 'fiscalite'=>DB::table('tax_records')->insertGetId([...Arr::except($data,'rate'),'rate'=>$data['rate'],'calculated_amount'=>(float)$calculator->commission($data['base_amount'],$data['rate']),'created_at'=>$now,'updated_at'=>$now]),
                 default=>abort(404),
             };
+            if($module==='devis'&&!empty($data['quote_request_id'])) DB::table('quote_requests')->where('id',$data['quote_request_id'])->update(['quote_id'=>$id,'status'=>'devis_envoye','updated_at'=>$now]);
             DB::table('audit_logs')->insert(['user_id'=>$request->user()->id,'event'=>$module.'.cree','auditable_type'=>$this->config($module)['table'],'auditable_id'=>$id,'old_values'=>null,'new_values'=>json_encode($data),'ip_address'=>$request->ip(),'created_at'=>$now]);
             return $id;
         });
@@ -229,10 +264,40 @@ class ModuleController extends Controller
 
     private function createStock(array $data, NumberSequenceService $numbers, int $userId): int
     {
-        $photo=$data['photo']??null; unset($data['photo']); $quantity=(float)$data['quantity'];
-        $id=DB::table('inventory_products')->insertGetId([...$data,'photo_path'=>$this->storePhoto($photo),'reference'=>$numbers->next('product'),'stock_value'=>$quantity*(float)$data['purchase_price'],'entered_at'=>$quantity>0?today():null,'exited_at'=>null,'created_at'=>now(),'updated_at'=>now()]);
+        $photo=$data['photo']??null; $gallery=$data['gallery']??[]; $origins=$data['origin_order_ids']??[]; unset($data['photo'],$data['gallery'],$data['origin_order_ids']); $quantity=(float)$data['quantity']; $reserved=(float)($data['reserved_quantity']??0);
+        $data['slug']=$this->uniqueProductSlug($data['slug']??$data['name']);
+        $reference=trim((string)($data['reference']??''))?:$numbers->next('product');
+        $id=DB::table('inventory_products')->insertGetId([...$data,'reserved_quantity'=>$reserved,'available_quantity'=>max(0,$quantity-$reserved),'total_purchase_cost'=>$quantity*(float)$data['purchase_price']+(float)($data['freight']??0),'sale_total'=>$quantity*(float)$data['sale_price'],'gallery_paths'=>json_encode($this->storeGallery($gallery)),'photo_path'=>$this->storePhoto($photo),'reference'=>$reference,'stock_value'=>$quantity*(float)$data['purchase_price'],'entered_at'=>$quantity>0?today():null,'exited_at'=>null,'created_at'=>now(),'updated_at'=>now()]);
+        $this->syncStockOrigins($id,$origins);
         if($quantity>0) DB::table('stock_movements')->insert(['inventory_product_id'=>$id,'type'=>'entree','quantity'=>$quantity,'before_quantity'=>0,'after_quantity'=>$quantity,'notes'=>'Stock initial','moved_at'=>now(),'user_id'=>$userId]);
         return $id;
+    }
+
+    private function updateStock(int $id, object $old, array $data, int $userId): void
+    {
+        $photo=$data['photo']??null; $gallery=$data['gallery']??[]; $origins=$data['origin_order_ids']??[];
+        unset($data['photo'],$data['gallery'],$data['origin_order_ids']);
+        $data['slug']=$this->uniqueProductSlug($data['slug']??$data['name'],$id);
+        $data['reference']=trim((string)($data['reference']??''))?:$old->reference;
+        $before=(float)$old->quantity; $after=(float)$data['quantity']; $reserved=(float)($data['reserved_quantity']??0);
+        DB::table('inventory_products')->where('id',$id)->update([...$data,'reserved_quantity'=>$reserved,'available_quantity'=>max(0,$after-$reserved),'total_purchase_cost'=>$after*(float)$data['purchase_price']+(float)($data['freight']??0),'sale_total'=>$after*(float)$data['sale_price'],'gallery_paths'=>$gallery?json_encode($this->storeGallery($gallery)):$old->gallery_paths,'photo_path'=>$photo?$this->storePhoto($photo):$old->photo_path,'stock_value'=>$after*(float)$data['purchase_price'],'entered_at'=>$after>$before?today():$old->entered_at,'exited_at'=>$after<$before?today():$old->exited_at,'updated_at'=>now()]);
+        $this->syncStockOrigins($id,$origins);
+        if($after!==$before) DB::table('stock_movements')->insert(['inventory_product_id'=>$id,'type'=>'inventaire','quantity'=>abs($after-$before),'before_quantity'=>$before,'after_quantity'=>$after,'notes'=>'Correction manuelle auditée','moved_at'=>now(),'user_id'=>$userId]);
+    }
+
+    private function syncStockOrigins(int $productId, array $orderIds): void
+    {
+        DB::table('inventory_product_origins')->where('inventory_product_id',$productId)->delete();
+        $now=now();
+        foreach(array_unique($orderIds) as $orderId) DB::table('inventory_product_origins')->insert(['inventory_product_id'=>$productId,'order_id'=>$orderId,'created_at'=>$now,'updated_at'=>$now]);
+    }
+
+    private function updateCatalogue(int $id, object $old, array $data): void
+    {
+        $gallery=$data['gallery']??[];
+        unset($data['gallery']);
+        $data['slug']=$this->uniqueProductSlug($data['slug']??$old->name,$id);
+        DB::table('inventory_products')->where('id',$id)->update([...$data,'gallery_paths'=>$gallery?json_encode($this->storeGallery($gallery)):$old->gallery_paths,'updated_at'=>now()]);
     }
 
     private function createSupplier(array $data): int
@@ -370,9 +435,9 @@ class ModuleController extends Controller
 
     private function createLocalSale(array $data, int $userId): int
     {
-        $product=DB::table('inventory_products')->lockForUpdate()->find($data['inventory_product_id']); $quantity=(float)$data['quantity']; if($quantity>(float)$product->quantity) throw ValidationException::withMessages(['quantity'=>'Stock insuffisant. Quantité disponible : '.$product->quantity]);
+        $product=DB::table('inventory_products')->lockForUpdate()->find($data['inventory_product_id']); $quantity=(float)$data['quantity']; if($quantity>(float)$product->available_quantity) throw ValidationException::withMessages(['quantity'=>'Stock disponible insuffisant. Quantité disponible : '.$product->available_quantity]);
         $total=$quantity*(float)$data['unit_price']; $paid=(float)($data['paid_amount']??0); if($paid>$total) throw ValidationException::withMessages(['paid_amount'=>'Le paiement ne peut pas dépasser le total de la vente.']); if($paid<$total&&empty($data['buyer_name'])) throw ValidationException::withMessages(['buyer_name'=>'Le nom de l’acheteur est obligatoire pour une vente non soldée.']); if($paid<$total&&empty($data['buyer_contact'])) throw ValidationException::withMessages(['buyer_contact'=>'Le contact est obligatoire pour une vente non soldée.']);
-        $after=(float)$product->quantity-$quantity; DB::table('inventory_products')->where('id',$product->id)->update(['quantity'=>$after,'stock_value'=>$after*(float)$product->purchase_price,'exited_at'=>today(),'updated_at'=>now()]); DB::table('stock_movements')->insert(['inventory_product_id'=>$product->id,'type'=>'sortie','quantity'=>$quantity,'before_quantity'=>$product->quantity,'after_quantity'=>$after,'notes'=>'Vente locale','moved_at'=>now(),'user_id'=>$userId]);
+        $after=(float)$product->quantity-$quantity; DB::table('inventory_products')->where('id',$product->id)->update(['quantity'=>$after,'available_quantity'=>max(0,$after-(float)$product->reserved_quantity),'total_purchase_cost'=>$after*(float)$product->purchase_price+(float)$product->freight,'sale_total'=>$after*(float)$product->sale_price,'stock_value'=>$after*(float)$product->purchase_price,'exited_at'=>today(),'updated_at'=>now()]); DB::table('stock_movements')->insert(['inventory_product_id'=>$product->id,'type'=>'sortie','quantity'=>$quantity,'before_quantity'=>$product->quantity,'after_quantity'=>$after,'notes'=>'Vente locale','moved_at'=>now(),'user_id'=>$userId]);
         return DB::table('local_sales')->insertGetId([...$data,'total'=>$total,'balance_due'=>$total-$paid,'status'=>$paid>=$total?'paye':($paid>0?'partiel':'credit'),'created_at'=>now(),'updated_at'=>now()]);
     }
 
@@ -389,6 +454,7 @@ class ModuleController extends Controller
         if($module==='devis') { $values['client_contact']=$record->contact; $item=DB::table('quote_items')->where('quote_id',$record->id)->first(); if($item) $values=[...$values,'product_name'=>$item->name,'specifications'=>$item->specifications,'quantity'=>$item->quantity,'supplier_id'=>$item->supplier_id,'commission'=>$item->commission]; }
         if($module==='commandes') { $item=DB::table('order_items')->where('order_id',$record->id)->first(); if($item) $values=[...$values,'product_name'=>$item->name,'specifications'=>$item->specifications,'quantity'=>$item->quantity,'supplier_id'=>$item->supplier_id,'supplier_price'=>$record->supplier_total]; }
         if($module==='achats') $values['order_id']=DB::table('supplier_payment_allocations')->where('supplier_payment_id',$record->id)->value('order_id');
+        if($module==='stock') $values['origin_order_ids']=DB::table('inventory_product_origins')->where('inventory_product_id',$record->id)->pluck('order_id')->map(fn($id)=>(string)$id)->all();
         if($module==='paiements') { [$values['type'],$values['payment_object'],$values['notes']]=$this->paymentReasonAndNotes($record->type,$record->notes); }
         if($module==='salaires') { $values['irsa_value']=$record->irsa_mode==='pourcentage'?$record->irsa_rate:$record->irsa_amount; $values['month']=date('Y-m',strtotime($record->month)); }
         return $values;
@@ -397,8 +463,9 @@ class ModuleController extends Controller
     private function applyUpdate(string $module, int $id, object $old, array $data, int $userId, BusinessCalculator $calculator): void
     {
         if($module==='fournisseurs') { $products=$data['products']??[]; DB::table('suppliers')->where('id',$id)->update([...Arr::except($data,'products'),'updated_at'=>now()]); $this->replaceSupplierProducts($id,$products); return; }
-        if(in_array($module,['clients','logistique','depenses','employes'],true)) { DB::table($this->config($module)['table'])->where('id',$id)->update([...$data,'updated_at'=>now()]); return; }
-        if($module==='stock') { $photo=$data['photo']??null; unset($data['photo']); $before=(float)$old->quantity; $after=(float)$data['quantity']; DB::table('inventory_products')->where('id',$id)->update([...$data,'photo_path'=>$photo?$this->storePhoto($photo):$old->photo_path,'stock_value'=>$after*(float)$data['purchase_price'],'entered_at'=>$after>$before?today():$old->entered_at,'exited_at'=>$after<$before?today():$old->exited_at,'updated_at'=>now()]); if($after!==$before) DB::table('stock_movements')->insert(['inventory_product_id'=>$id,'type'=>'inventaire','quantity'=>abs($after-$before),'before_quantity'=>$before,'after_quantity'=>$after,'notes'=>'Correction manuelle auditée','moved_at'=>now(),'user_id'=>$userId]); return; }
+        if(in_array($module,['clients','demandes-devis','logistique','depenses','employes'],true)) { DB::table($this->config($module)['table'])->where('id',$id)->update([...$data,'updated_at'=>now()]); return; }
+        if($module==='stock') { $this->updateStock($id,$old,$data,$userId); return; }
+        if($module==='catalogue') { $this->updateCatalogue($id,$old,$data); return; }
         if($module==='devis') {
             $client=DB::table('clients')->find($data['client_id']); $supplierTotal=collect($data['items'])->sum(fn($item)=>(float)$item['supplier_price']*(float)$item['quantity']); $logistics=collect($data['items'])->sum(fn($item)=>(float)($item['china_delivery']??0)+(float)($item['packaging']??0)+(float)($item['freight']??0)); $margin=collect($data['items'])->sum(fn($item)=>(float)($item['margin']??0)); $total=collect($data['items'])->sum(fn($item)=>$this->quoteItemSalePrice($item));
             DB::table('quotes')->where('id',$id)->update(['client_id'=>$client->id,'client_name'=>$data['client_name'],'contact'=>$data['client_contact'],'client_type'=>$client->type,'sent_at'=>$data['status']==='brouillon'?null:($old->sent_at??today()),'valid_until'=>$data['valid_until'],'shipping_mode'=>$data['shipping_mode'],'shipping_delay'=>$data['shipping_delay']??null,'bank_details'=>$data['bank_details']??null,'payment_terms'=>$data['payment_terms']??null,'warranty'=>$data['warranty']??null,'notes'=>$data['notes']??null,'status'=>$data['status'],'supplier_estimate'=>$supplierTotal,'logistics_estimate'=>$logistics,'margin'=>$margin,'total'=>$total,'updated_at'=>now()]);
@@ -490,31 +557,81 @@ class ModuleController extends Controller
 
     private function updateLocalSale(int $id, object $old, array $data, int $userId): void
     {
-        $oldProduct=DB::table('inventory_products')->lockForUpdate()->find($old->inventory_product_id); DB::table('inventory_products')->where('id',$oldProduct->id)->update(['quantity'=>(float)$oldProduct->quantity+(float)$old->quantity,'stock_value'=>((float)$oldProduct->quantity+(float)$old->quantity)*(float)$oldProduct->purchase_price,'updated_at'=>now()]);
-        $product=DB::table('inventory_products')->lockForUpdate()->find($data['inventory_product_id']); $quantity=(float)$data['quantity']; if($quantity>(float)$product->quantity) throw ValidationException::withMessages(['quantity'=>'Stock insuffisant pour corriger cette vente.']); $total=$quantity*(float)$data['unit_price']; $paid=(float)($data['paid_amount']??0); if($paid>$total) throw ValidationException::withMessages(['paid_amount'=>'Le paiement ne peut pas dépasser le total.']); if($paid<$total&&(empty($data['buyer_name'])||empty($data['buyer_contact']))) throw ValidationException::withMessages(['buyer_name'=>'Nom et contact requis pour une vente non soldée.']); $after=(float)$product->quantity-$quantity; DB::table('inventory_products')->where('id',$product->id)->update(['quantity'=>$after,'stock_value'=>$after*(float)$product->purchase_price,'exited_at'=>today(),'updated_at'=>now()]); DB::table('local_sales')->where('id',$id)->update([...$data,'total'=>$total,'balance_due'=>$total-$paid,'status'=>$paid>=$total?'paye':($paid>0?'partiel':'credit'),'updated_at'=>now()]); DB::table('stock_movements')->insert(['inventory_product_id'=>$product->id,'type'=>'inventaire','quantity'=>$quantity,'before_quantity'=>$product->quantity,'after_quantity'=>$after,'notes'=>'Correction vente locale','moved_at'=>now(),'user_id'=>$userId]);
+        $oldProduct=DB::table('inventory_products')->lockForUpdate()->find($old->inventory_product_id); $restored=(float)$oldProduct->quantity+(float)$old->quantity; DB::table('inventory_products')->where('id',$oldProduct->id)->update(['quantity'=>$restored,'available_quantity'=>max(0,$restored-(float)$oldProduct->reserved_quantity),'total_purchase_cost'=>$restored*(float)$oldProduct->purchase_price+(float)$oldProduct->freight,'sale_total'=>$restored*(float)$oldProduct->sale_price,'stock_value'=>$restored*(float)$oldProduct->purchase_price,'updated_at'=>now()]);
+        $product=DB::table('inventory_products')->lockForUpdate()->find($data['inventory_product_id']); $quantity=(float)$data['quantity']; if($quantity>(float)$product->available_quantity) throw ValidationException::withMessages(['quantity'=>'Stock disponible insuffisant pour corriger cette vente.']); $total=$quantity*(float)$data['unit_price']; $paid=(float)($data['paid_amount']??0); if($paid>$total) throw ValidationException::withMessages(['paid_amount'=>'Le paiement ne peut pas dépasser le total.']); if($paid<$total&&(empty($data['buyer_name'])||empty($data['buyer_contact']))) throw ValidationException::withMessages(['buyer_name'=>'Nom et contact requis pour une vente non soldée.']); $after=(float)$product->quantity-$quantity; DB::table('inventory_products')->where('id',$product->id)->update(['quantity'=>$after,'available_quantity'=>max(0,$after-(float)$product->reserved_quantity),'total_purchase_cost'=>$after*(float)$product->purchase_price+(float)$product->freight,'sale_total'=>$after*(float)$product->sale_price,'stock_value'=>$after*(float)$product->purchase_price,'exited_at'=>today(),'updated_at'=>now()]); DB::table('local_sales')->where('id',$id)->update([...$data,'total'=>$total,'balance_due'=>$total-$paid,'status'=>$paid>=$total?'paye':($paid>0?'partiel':'credit'),'updated_at'=>now()]); DB::table('stock_movements')->insert(['inventory_product_id'=>$product->id,'type'=>'inventaire','quantity'=>$quantity,'before_quantity'=>$product->quantity,'after_quantity'=>$after,'notes'=>'Correction vente locale','moved_at'=>now(),'user_id'=>$userId]);
     }
 
     private function decorate(array $rows): array
     {
-        $maps=['client_id'=>DB::table('clients')->pluck('name','id'),'supplier_id'=>DB::table('suppliers')->pluck('name','id'),'order_id'=>DB::table('orders')->pluck('number','id'),'inventory_product_id'=>DB::table('inventory_products')->pluck('name','id'),'employee_id'=>DB::table('employees')->pluck('name','id'),'user_id'=>DB::table('users')->pluck('name','id')];
-        return array_map(function($row) use($maps){foreach($maps as $key=>$map) if(isset($row[$key])) $row[$key]=$map[$row[$key]]??$row[$key]; if(array_key_exists('proof_path',$row)) $row['proof_path']=$row['proof_path']?'/purchase-proof/'.basename($row['proof_path']):($row['proof_url']??null); return $row;},$rows);
+        $maps=['client_id'=>DB::table('clients')->pluck('name','id'),'supplier_id'=>DB::table('suppliers')->pluck('name','id'),'order_id'=>DB::table('orders')->pluck('number','id'),'inventory_product_id'=>DB::table('inventory_products')->pluck('name','id'),'employee_id'=>DB::table('employees')->pluck('name','id'),'user_id'=>DB::table('users')->pluck('name','id'),'assigned_to'=>DB::table('users')->pluck('name','id'),'quote_id'=>DB::table('quotes')->pluck('number','id')];
+        return array_map(function($row) use($maps){if(isset($row['quote_id'])) $row['quote_record_id']=$row['quote_id']; if(isset($row['order_id'])) $row['order_record_id']=$row['order_id']; foreach($maps as $key=>$map) if(isset($row[$key])) $row[$key]=$map[$row[$key]]??$row[$key]; if(isset($row['order_record_id'])) $row['order_id']=$row['order_record_id'].'::'.$row['order_id']; if(array_key_exists('proof_path',$row)) $row['proof_path']=$row['proof_path']?'/purchase-proof/'.basename($row['proof_path']):($row['proof_url']??null); return $row;},$rows);
     }
 
     private function fields(string $module): array
     {
-        $select=fn($name,$label,$options,$required=true,$default=null)=>compact('name','label','options','required','default')+['type'=>'select']; $input=fn($name,$label,$type='text',$required=true,$default=null)=>compact('name','label','type','required','default');
+        $select=fn($name,$label,$options,$required=true,$default=null)=>compact('name','label','options','required','default')+['type'=>'select']; $multi=fn($name,$label,$options,$required=false,$default=[])=>compact('name','label','options','required','default')+['type'=>'multiselect']; $input=fn($name,$label,$type='text',$required=true,$default=null)=>compact('name','label','type','required','default');
         $clients=DB::table('clients')->where('active',true)->orderBy('name')->get()->map(fn($x)=>['value'=>$x->id,'label'=>$x->name,'contact'=>$x->contact,'address'=>$x->address,'type'=>$x->type,'credit_balance'=>(float)$x->credit_balance])->all(); $suppliers=DB::table('suppliers')->where('active',true)->orderBy('name')->get()->map(fn($x)=>['value'=>$x->id,'label'=>$x->name,'contact'=>$x->contact])->all(); $orders=DB::table('orders')->orderByDesc('id')->get()->map(fn($x)=>['value'=>$x->id,'label'=>$x->number])->all(); $quotes=DB::table('quotes')->whereNull('deleted_at')->orderByDesc('id')->get()->map(fn($x)=>['value'=>$x->id,'label'=>$x->number])->all(); $products=DB::table('inventory_products')->where('quantity','>',0)->orderBy('name')->get()->map(fn($x)=>['value'=>$x->id,'label'=>$x->name.' ('.$x->quantity.')'])->all(); $employees=DB::table('employees')->where('active',true)->get()->map(fn($x)=>['value'=>$x->id,'label'=>$x->name])->all(); $invoices=DB::table('invoices')->orderByDesc('id')->get()->map(fn($x)=>['value'=>$x->id,'label'=>$x->number])->all();
+        $users=DB::table('users')->orderBy('name')->get()->map(fn($x)=>['value'=>$x->id,'label'=>$x->name])->all();
+        $originOrders=DB::table('orders')->whereNull('deleted_at')->orderByDesc('id')->get()->map(function($order){$containers=DB::table('shipments')->where('order_id',$order->id)->whereNotNull('container_reference')->pluck('container_reference')->filter()->unique()->implode(', ');return ['value'=>$order->id,'label'=>$order->number.($containers?' · Conteneur '.$containers:'')];})->all();
         $o=fn(array $values)=>array_map(fn($v)=>['value'=>$v,'label'=>ucfirst(str_replace('_',' ',$v))],$values); $today=today()->toDateString();
         return match($module){
+            'demandes-devis'=>[$input('client_name','Nom du client'),$input('client_contact','Téléphone / WhatsApp / e-mail'),$select('source','Source de la demande',[['value'=>'facebook','label'=>'Facebook'],['value'=>'bouche_a_oreille','label'=>'Bouche-à-oreille'],['value'=>'autre','label'=>'Autre']]),$input('description','Description du produit ou service demandé','textarea'),$input('quantity','Quantité souhaitée','number',true,1),$input('budget','Budget indicatif (Ar)','number',false),$input('desired_deadline','Délai souhaité','text',false),$select('shipping_mode','Mode de livraison souhaité',[['value'=>'maritime','label'=>'Maritime'],['value'=>'aerien','label'=>'Aérien'],['value'=>'non_precise','label'=>'Non précisé']],true,'non_precise'),$select('status','Statut',[['value'=>'nouvelle_demande','label'=>'Nouvelle demande'],['value'=>'en_cours_analyse','label'=>'En cours d’analyse'],['value'=>'devis_envoye','label'=>'Devis envoyé'],['value'=>'sans_suite','label'=>'Sans suite']],true,'nouvelle_demande'),$input('request_date','Date de la demande','date',true,$today),$select('assigned_to','Assigné à',$users,false),$input('internal_note','Note interne','textarea',false)],
             'clients'=>[$input('name','Nom ou raison sociale'),$input('contact','WhatsApp / téléphone'),$select('type','Type de client',$o(['revendeur','entrepreneur','particulier','hotel'])),$input('address','Adresse','text',false),$input('notes','Notes','textarea',false),$select('active','Statut',[['value'=>1,'label'=>'Actif'],['value'=>0,'label'=>'Inactif']],true,1)],
             'fournisseurs'=>[$input('name','Nom du fournisseur'),$input('category','Catégorie','text',false),$input('moq','MOQ','number',false),$input('production_days','Délai de production (jours)','number',false),$input('contact','Contact','text',false),$select('quality_rating','Qualité',$o(['1','2','3','4','5']),true,3),$input('notes','Notes','textarea',false)],
-            'stock'=>[$input('name','Nom du produit'),$input('photo','Photo du produit (optionnelle)','file',false),$input('quantity','Quantité initiale','number',true,0),$input('purchase_price','Prix d’achat (Ar)','number'),$input('sale_price','Prix de vente (Ar)','number'),$input('alert_threshold','Seuil d’alerte','number',false)],
+            'stock'=>[
+                $input('reference','Référence produit / SKU','text',false)+['section'=>'Identification produit'],
+                $input('name','Nom du produit')+['section'=>'Identification produit'],
+                $input('photo','Photo produit','file',false)+['section'=>'Identification produit'],
+                $input('quantity','Quantité en stock','number',true,0)+['section'=>'Identification produit'],
+                $input('reserved_quantity','Quantité réservée','number',false,0)+['section'=>'Identification produit'],
+                $input('available_quantity','Quantité disponible','number',false,0)+['section'=>'Identification produit','readOnly'=>true],
+                $input('alert_threshold','Seuil d’alerte','number',false)+['section'=>'Identification produit'],
+                $input('purchase_price','Prix d’achat unitaire (Ar)','number')+['section'=>'Coûts d’achat & transport'],
+                $input('cbm','CBM / volume','number',false)+['section'=>'Coûts d’achat & transport'],
+                $input('freight','Fret alloué au produit (Ar)','number',false,0)+['section'=>'Coûts d’achat & transport'],
+                $input('total_purchase_cost','Prix total achat','number',false,0)+['section'=>'Coûts d’achat & transport','readOnly'=>true,'money'=>true],
+                $input('sale_price','Prix de vente unitaire (Ar)','number')+['section'=>'Vente'],
+                $input('sale_total','Prix total vente','number',false,0)+['section'=>'Vente','readOnly'=>true,'money'=>true],
+                $multi('origin_order_ids','Commande(s) d’origine / conteneur',$originOrders)+['section'=>'Liaison'],
+            ],
+            'catalogue'=>[
+                $input('slug','Adresse catalogue (générée automatiquement si vide)','text',false),
+                $input('gallery','Galerie catalogue — 6 photos maximum','files',false),
+                $input('category','Catégorie catalogue','text',false),
+                $input('short_description','Description courte','textarea',false),
+                $input('catalog_description','Description catalogue','textarea',false),
+                $select('is_published','Publication catalogue',[['value'=>0,'label'=>'Non publié'],['value'=>1,'label'=>'Publié']],true,0),
+                $select('is_featured','Mise en avant sur l’accueil',[['value'=>0,'label'=>'Non'],['value'=>1,'label'=>'Oui']],true,0),
+                $select('show_price','Afficher le prix de vente',[['value'=>0,'label'=>'Masquer le prix'],['value'=>1,'label'=>'Afficher le prix']],true,0),
+            ],
             'devis'=>[$select('client_id','Client enregistré (optionnel)',$clients,false),$input('client_name','Nom du client'),$input('client_contact','Contact du client'),$select('client_type','Type de client',$o(['revendeur','entrepreneur','particulier','hotel']),true,'particulier'),$input('valid_until','Valide jusqu’au','date'),$select('shipping_mode','Mode d’envoi',[['value'=>'maritime','label'=>'Maritime'],['value'=>'aerien','label'=>'Aérien']]),$input('shipping_delay','Délai d’expédition','text',false),$select('status','Statut',[['value'=>'brouillon','label'=>'Brouillon'],['value'=>'envoye','label'=>'Envoyé'],['value'=>'negociation','label'=>'Négociation'],['value'=>'accepte','label'=>'Accepté'],['value'=>'refuse','label'=>'Refusé'],['value'=>'sans_reponse','label'=>'Sans réponse'],['value'=>'relance_1','label'=>'Relance 1'],['value'=>'relance_2','label'=>'Relance 2']],true,'brouillon'),$input('bank_details','Informations bancaires / compte bancaire','textarea',false),$input('payment_terms','Conditions de paiement','textarea',false),$input('warranty','Garantie','textarea',false),$input('notes','Note / remarque','textarea',false)],
             'commandes'=>[$select('quote_id','Créer à partir du devis n°',$quotes,false),$select('client_id','Client',$clients),$select('commission_enabled','Appliquer une commission',[['value'=>0,'label'=>'Non'],['value'=>1,'label'=>'Oui']],true,0),$input('commission_rate','Taux commission (%)','number',false,8),$input('deposit','Acompte reçu (Ar)','number',false,0),$input('ordered_at','Date de commande','date',true,$today),$select('shipping_mode','Mode d’envoi',$o(['aerien','maritime']),false),$select('status','Statut',[['value'=>'brouillon','label'=>'Brouillon'],['value'=>'demande_recue','label'=>'Demande reçue'],['value'=>'attente_validation','label'=>'Attente validation'],['value'=>'confirmee','label'=>'Confirmée'],['value'=>'acompte_recu','label'=>'Acompte reçu'],['value'=>'achat_lance','label'=>'Achat lancé'],['value'=>'achat_effectue','label'=>'Achat effectué']],true,'brouillon'),$input('notes','Notes internes','textarea',false)],
             'paiements'=>[$select('client_id','Client',$clients),$select('order_id','Commande à créditer (optionnelle)',$orders,false),$select('invoice_id','Facture à créditer (optionnelle)',$invoices,false),$input('paid_at','Date','date',true,$today),$input('amount','Montant reçu (Ar)','number'),$input('allocated_amount','Montant affecté (Ar)','number',false,0),$select('method','Mode de paiement',$o(['Mobile Money','Virement bancaire','Espèces','Chèque'])),$input('reference','Référence','text',false),$select('type','Motif du paiement',[['value'=>'acompte_commande','label'=>'Acompte de commande'],['value'=>'solde_commande','label'=>'Solde de commande'],['value'=>'fournisseur_chine','label'=>'Paiement fournisseur en Chine'],['value'=>'fret_transport','label'=>'Frais de fret / transport'],['value'=>'frais_service','label'=>'Frais de service'],['value'=>'autre','label'=>'Autre']]),$input('payment_object','Objet du paiement','text'),$input('notes','Précision / notes (obligatoire si Autre)','textarea',false)],
             'factures'=>[$select('order_id','Commande',$orders),$select('type','Type de facture',$o(['produits','frais'])),$input('issued_at','Date','date',true,$today),$input('subtotal','Total (Ar)','number'),$input('paid_amount','Montant déjà reçu (Ar)','number',false,0),$select('status','Statut',$o(['brouillon','provisoire','finale','payee','partielle']),true,'brouillon')],
             'achats'=>[$select('supplier_id','Fournisseur',$suppliers),$select('order_id','Commande concernée',$orders),$input('paid_at','Date','date',true,$today),$input('amount','Montant payé (Ar)','number'),$select('method','Mode',$o(['WeChat','Alipay','banque'])),$input('reference','Référence','text',false),$input('proof','Justificatif — capture (optionnelle)','file',false),$input('proof_url','Justificatif — lien (optionnel)','url',false),$select('status','Statut du paiement',$o(['paye','partiel','en_attente'])),$input('notes','Notes de suivi','textarea',false)],
-            'logistique'=>[$select('order_id','Commande',$orders),$input('tracking','Tracking fournisseur','text',false),$select('mode','Mode',$o(['aerien','maritime'])),$input('weight','Poids (kg)','number',false),$input('cbm','Volume / CBM','number',false),$input('cost','Coût de livraison (Ar)','number',false,0),$input('forwarder','Transitaire','text',false),$input('china_departure_at','Départ de Chine','date',false),$input('expected_madagascar_at','Arrivée prévue','date',false),$select('status','Statut',$o(['en_attente','en_transit','arrive_en_chine','expedie','arrive_madagascar','remis_client']))],
+            'logistique'=>[
+                $select('order_id','Numéro de commande',$orders)+['section'=>'1. Liaison'],
+                $select('status','Statut',[
+                    ['value'=>'commande_lancee','label'=>'Commande lancée'],
+                    ['value'=>'en_attente','label'=>'En attente de livraison'],
+                    ['value'=>'arrive_en_chine','label'=>'Arrivé dépôt Chine'],
+                    ['value'=>'expedie','label'=>'Expédié'],
+                    ['value'=>'en_transit','label'=>'En transit'],
+                    ['value'=>'arrive_madagascar','label'=>'Arrivé Madagascar'],
+                    ['value'=>'remis_client','label'=>'Remis au client (historique)'],
+                ],true,'commande_lancee')+['section'=>'2. Statut'],
+                $input('tracking','Tracking number','text',false)+['section'=>'3. Suivi'],
+                $input('forwarder','Transitaire','text',false)+['section'=>'3. Suivi'],
+                $input('container_reference','Référence conteneur','text',false)+['section'=>'3. Suivi'],
+                $input('china_departure_at','Date de départ (Chine)','date',false)+['section'=>'4. Dates','startRow'=>true],
+                $input('china_warehouse_at','Date d’arrivée en Chine (dépôt)','date',false)+['section'=>'4. Dates'],
+                $input('expected_madagascar_at','Arrivage prévu (Madagascar)','date',false)+['section'=>'4. Dates'],
+                $input('arrived_madagascar_at','Arrivage réel (Madagascar)','date',false)+['section'=>'4. Dates'],
+                $input('cbm','CBM / volume','number',false)+['section'=>'5. Volume'],
+                $input('package_count','Nombre de colis','number',false)+['section'=>'5. Volume'],
+                $input('carton_count','Nombre de carton','number',false)+['section'=>'5. Volume'],
+                $input('cost','Frais de fret (Ar)','number',false,0)+['section'=>'6. Coût'],
+            ],
             'ventes'=>[$select('inventory_product_id','Produit',$products),$input('sold_at','Date de vente','date',true,$today),$input('quantity','Quantité','number'),$input('unit_price','Prix unitaire (Ar)','number'),$input('paid_amount','Montant payé (Ar)','number',false,0),$select('payment_method','Mode de paiement',$o(['Espèces','Mobile Money','Virement']),false),$input('buyer_name','Nom acheteur si crédit','text',false),$input('buyer_contact','Contact acheteur si crédit','text',false),$input('notes','Note','textarea',false)],
             'depenses'=>[$select('category','Catégorie',[['value'=>'achat','label'=>'Achat'],['value'=>'logistique','label'=>'Logistique'],['value'=>'marketing','label'=>'Marketing'],['value'=>'transport','label'=>'Transport'],['value'=>'loyer_depot_chine','label'=>'Loyer dépôt en Chine'],['value'=>'loyer_depot_madagascar','label'=>'Loyer dépôt à Madagascar'],['value'=>'loyer_bureau','label'=>'Loyer de bureau'],['value'=>'services_publics','label'=>'Eau, électricité et services'],['value'=>'salaire','label'=>'Salaire'],['value'=>'IRSA','label'=>'IRSA'],['value'=>'autre','label'=>'Autre']]),$input('amount','Montant (Ar)','number'),$input('spent_at','Date','date',true,$today),$select('type','Type de dépense',[['value'=>'business','label'=>'Professionnelle'],['value'=>'personnel','label'=>'Personnelle']]),$input('description','Description','textarea'),$select('order_id','Commande liée (optionnelle)',$orders,false),$select('status','Statut',$o(['paye','en_attente']),true,'paye')],
             'employes'=>[$input('name','Nom et prénom'),$input('position','Poste'),$input('monthly_salary','Salaire mensuel habituel (Ar)','number'),$select('irsa_mode','Mode IRSA par défaut',$o(['pourcentage','fixe'])),$input('irsa_value','Taux (%) ou montant IRSA','number'),$select('active','Statut',[['value'=>1,'label'=>'Actif'],['value'=>0,'label'=>'Inactif']],true,1),$input('left_at','Date de départ','date',false),$input('departure_reason','Motif du départ','textarea',false)],
@@ -564,8 +681,14 @@ class ModuleController extends Controller
 
     private function orderTemplates(string $module): array
     {
-        if($module!=='factures') return [];
-        return DB::table('orders')->whereNull('deleted_at')->orderByDesc('id')->get()->map(fn($order)=>['id'=>$order->id,'number'=>$order->number,'client_id'=>$order->client_id,'subtotal'=>(float)$order->client_total,'paid_amount'=>(float)$order->deposit,'balance_due'=>(float)$order->balance_due])->keyBy('id')->all();
+        if(!in_array($module,['factures','logistique'],true)) return [];
+        return DB::table('orders')->whereNull('deleted_at')->orderByDesc('id')->get()->map(function($order) use($module){
+            if($module==='logistique') {
+                $packages=DB::table('order_packages')->where('order_id',$order->id);
+                return ['id'=>$order->id,'number'=>$order->number,'cbm'=>(float)($packages->sum('volume_cbm')?:$order->cbm),'package_count'=>$packages->count()];
+            }
+            return ['id'=>$order->id,'number'=>$order->number,'client_id'=>$order->client_id,'subtotal'=>(float)$order->client_total,'paid_amount'=>(float)$order->deposit,'balance_due'=>(float)$order->balance_due];
+        })->keyBy('id')->all();
     }
 
     private function invoicePrefill(string $module, int $orderId): array
@@ -575,6 +698,30 @@ class ModuleController extends Controller
         if(!$order) return [];
         $paid=(float)$order->deposit; $total=(float)$order->client_total;
         return ['order_id'=>$order->id,'type'=>'produits','issued_at'=>today()->toDateString(),'subtotal'=>$total,'paid_amount'=>$paid,'status'=>$paid>=$total?'payee':($paid>0?'partielle':'brouillon')];
+    }
+
+    private function quoteRequestPrefill(int $requestId): array
+    {
+        if(!$requestId) return [[],null];
+        $request=DB::table('quote_requests')->whereNull('deleted_at')->find($requestId);
+        if(!$request||$request->quote_id) return [[],null];
+
+        $prefill=[
+            'quote_request_id'=>$request->id,
+            'client_name'=>$request->client_name,
+            'client_contact'=>$request->client_contact,
+            'client_type'=>'particulier',
+            'shipping_mode'=>in_array($request->shipping_mode,['maritime','aerien'],true)?$request->shipping_mode:'maritime',
+            'shipping_delay'=>$request->desired_deadline,
+            'notes'=>$request->internal_note,
+        ];
+        $item=[
+            ...$this->emptyItem('devis'),
+            'name'=>Str::limit($request->description,255,''),
+            'specifications'=>$request->description,
+            'quantity'=>$request->quantity,
+        ];
+        return [$prefill,$item];
     }
 
     private function quoteTemplates(string $module): array
@@ -645,21 +792,37 @@ class ModuleController extends Controller
     {
         return match($module){
             'clients'=>['active'=>'Statut'],
+            'demandes-devis'=>['status'=>'Statut'],
             'devis'=>['status'=>'Statut'],
             'commandes'=>['status'=>'Statut'],
             'paiements'=>['type'=>'Type','status'=>'Statut'],
             'factures'=>['type'=>'Type','status'=>'Statut'],
             'fournisseurs'=>['active'=>'Statut'],
             'achats'=>['method'=>'Mode','status'=>'Statut'],
-            'logistique'=>['mode'=>'Mode','status'=>'Statut'],
+            'logistique'=>['status'=>'Statut'],
             'ventes'=>['status'=>'Statut','payment_method'=>'Paiement'],
             'depenses'=>['category'=>'Catégorie','type'=>'Type'],
             'salaires'=>['status'=>'Statut'],
             'employes'=>['active'=>'Statut'],
             'fiscalite'=>['type'=>'Type','status'=>'Statut'],
+            'stock'=>['is_published'=>'Catalogue','category'=>'Catégorie'],
+            'catalogue'=>['is_published'=>'Publication','is_featured'=>'Mise en avant','category'=>'Catégorie'],
+            'demandes'=>['status'=>'Statut','client_type'=>'Profil'],
             'rapports'=>['event'=>'Opération'],
             default=>[],
         };
+    }
+
+    private function uniqueProductSlug(string $value, ?int $ignoreId=null): string
+    {
+        $base=Str::slug($value)?:'produit'; $slug=$base; $suffix=2;
+        while(DB::table('inventory_products')->where('slug',$slug)->when($ignoreId,fn($query)=>$query->where('id','!=',$ignoreId))->exists()) $slug=$base.'-'.$suffix++;
+        return $slug;
+    }
+
+    private function storeGallery(array $files): array
+    {
+        return collect($files)->filter(fn($file)=>$file instanceof UploadedFile)->map(fn($file)=>$this->storePhoto($file))->filter()->values()->all();
     }
 
 }

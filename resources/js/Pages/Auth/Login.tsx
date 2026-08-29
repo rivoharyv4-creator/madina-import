@@ -1,10 +1,10 @@
 import Checkbox from '@/Components/Checkbox';
-import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
 import GuestLayout from '@/Layouts/GuestLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
+import { ShieldAlert } from 'lucide-react';
 import { FormEventHandler } from 'react';
 
 export default function Login({
@@ -23,20 +23,22 @@ export default function Login({
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
 
-        post(route('login'), {
+        post(window.location.pathname, {
             onFinish: () => reset('password'),
         });
     };
 
     return (
         <GuestLayout>
-            <Head title="Log in" />
+            <Head title="Connexion sécurisée" />
 
             {status && (
                 <div className="mb-4 text-sm font-medium text-green-600">
                     {status}
                 </div>
             )}
+
+            {errors.email&&<div role="alert" aria-live="polite" className="mb-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-red-800"><span className="grid size-9 shrink-0 place-items-center rounded-lg bg-white text-[#BD2433] shadow-sm"><ShieldAlert size={18}/></span><div><strong className="block text-sm">Connexion impossible</strong><p className="mt-0.5 text-xs leading-relaxed text-red-700">{errors.email}</p><p className="mt-1.5 text-[10px] text-red-500">Pour votre sécurité, nous ne précisons pas quelle information est incorrecte.</p></div></div>}
 
             <form onSubmit={submit}>
                 <div>
@@ -49,15 +51,16 @@ export default function Login({
                         value={data.email}
                         className="mt-1 block w-full"
                         autoComplete="username"
+                        autoCapitalize="none"
+                        spellCheck={false}
+                        aria-invalid={Boolean(errors.email)}
                         isFocused={true}
                         onChange={(e) => setData('email', e.target.value)}
                     />
-
-                    <InputError message={errors.email} className="mt-2" />
                 </div>
 
                 <div className="mt-4">
-                    <InputLabel htmlFor="password" value="Password" />
+                    <InputLabel htmlFor="password" value="Mot de passe" />
 
                     <TextInput
                         id="password"
@@ -66,10 +69,10 @@ export default function Login({
                         value={data.password}
                         className="mt-1 block w-full"
                         autoComplete="current-password"
+                        aria-invalid={Boolean(errors.email||errors.password)}
                         onChange={(e) => setData('password', e.target.value)}
                     />
-
-                    <InputError message={errors.password} className="mt-2" />
+                    {errors.password&&<p className="mt-2 text-xs text-red-600">{errors.password}</p>}
                 </div>
 
                 <div className="mt-4 block">
@@ -85,7 +88,7 @@ export default function Login({
                             }
                         />
                         <span className="ms-2 text-sm text-gray-600">
-                            Remember me
+                            Se souvenir de moi
                         </span>
                     </label>
                 </div>
@@ -96,12 +99,12 @@ export default function Login({
                             href={route('password.request')}
                             className="rounded-md text-sm text-gray-600 underline hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                         >
-                            Forgot your password?
+                            Mot de passe oublié ?
                         </Link>
                     )}
 
                     <PrimaryButton className="ms-4" disabled={processing}>
-                        Log in
+                        {processing?'Vérification…':'Se connecter'}
                     </PrimaryButton>
                 </div>
             </form>

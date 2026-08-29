@@ -130,8 +130,8 @@ class DemoDataSeeder extends Seeder
                 $reference = "PRD-DEMO-$suffix";
                 $stockQuantity = 10 + $i;
                 DB::table('inventory_products')->updateOrInsert(['reference' => $reference], [
-                    'name' => $product, 'photo_path' => null, 'quantity' => $stockQuantity, 'purchase_price' => $unitCost,
-                    'sale_price' => round($lineTotal / $quantity, 2), 'stock_value' => $stockQuantity * $unitCost,
+                    'name' => $product, 'photo_path' => null, 'quantity' => $stockQuantity, 'reserved_quantity' => 0, 'available_quantity' => $stockQuantity, 'purchase_price' => $unitCost,
+                    'cbm' => null, 'freight' => 0, 'total_purchase_cost' => $stockQuantity * $unitCost, 'sale_price' => round($lineTotal / $quantity, 2), 'sale_total' => $stockQuantity * round($lineTotal / $quantity, 2), 'stock_value' => $stockQuantity * $unitCost,
                     'entered_at' => $date, 'exited_at' => null, 'alert_threshold' => 5, 'created_at' => $now, 'updated_at' => $now,
                 ]);
                 $inventoryId = DB::table('inventory_products')->where('reference', $reference)->value('id');

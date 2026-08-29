@@ -10,11 +10,17 @@ use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware('guest')->group(function () {
-    Route::get('login', [AuthenticatedSessionController::class, 'create'])
+$adminLoginPath = trim((string) config('madina.admin_login_path', 'gestion-privee'), '/');
+
+if ($adminLoginPath === '') {
+    $adminLoginPath = 'gestion-privee';
+}
+
+Route::middleware('guest')->group(function () use ($adminLoginPath) {
+    Route::get($adminLoginPath, [AuthenticatedSessionController::class, 'create'])
         ->name('login');
 
-    Route::post('login', [AuthenticatedSessionController::class, 'store']);
+    Route::post($adminLoginPath, [AuthenticatedSessionController::class, 'store']);
 
     Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
         ->name('password.request');

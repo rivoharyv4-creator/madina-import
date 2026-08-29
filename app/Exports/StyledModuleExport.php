@@ -134,6 +134,7 @@ class StyledModuleExport implements FromArray, WithCustomStartCell, WithDrawings
     private function value(string $key, mixed $value): mixed
     {
         if($value===null||$value==='') return '';
+        if($key==='order_id'&&str_contains((string)$value,'::')) [, $value]=explode('::',(string)$value,2);
         if($key==='photo_path') return '';
         if($key==='active') return $value?'Actif':'Inactif';
         if($this->isMoney($key)||in_array($key,['quantity','moq','quality_rating'],true)) return (float)$value;
