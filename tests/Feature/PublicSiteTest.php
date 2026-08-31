@@ -55,6 +55,13 @@ class PublicSiteTest extends TestCase
         $payload=['name'=>'Entreprise Test','contact'=>'+261340000000','client_type'=>'entreprise','need'=>'Machine de production','message'=>'Nous souhaitons étudier une machine pour notre atelier.','consent'=>true,'website'=>''];
         $this->post('/contact',$payload)->assertRedirect()->assertSessionHas('success');
         $this->assertDatabaseHas('contact_requests',['name'=>'Entreprise Test','status'=>'nouvelle']);
+        $requestId=DB::table('contact_requests')->where('name','Entreprise Test')->value('id');
+        $manager=User::where('email','manager@madina-import.mg')->firstOrFail();
+        $this->actingAs($manager)->get("/modules/demandes/{$requestId}")->assertOk()->assertInertia(fn(Assert $page)=>$page
+            ->component('Module/PublicRequestShow')
+            ->where('request.name','Entreprise Test')
+            ->where('request.need','Machine de production')
+        );
         $this->post('/contact',[...$payload,'website'=>'spam.example'])->assertSessionHasErrors('website');
     }
 

@@ -39,7 +39,7 @@ class ModuleController extends Controller
             'logistique'=>['title'=>'Suivi Logistique','table'=>'shipments','primary'=>'Nouveau suivi logistique','editable'=>true,'columns'=>['order_id'=>'N° commande','tracking'=>'Tracking number','forwarder'=>'Transitaire','container_reference'=>'Référence conteneur','expected_madagascar_at'=>'Arrivage prévu','cbm'=>'CBM / volume','package_count'=>'Colis','carton_count'=>'Cartons','cost'=>'Frais de fret','status'=>'Statut']],
             'stock'=>['title'=>'Stock','table'=>'inventory_products','primary'=>'Ajouter un produit','editable'=>true,'columns'=>['photo_path'=>'Photo','reference'=>'SKU','name'=>'Produit','quantity'=>'Stock','reserved_quantity'=>'Réservée','available_quantity'=>'Disponible','total_purchase_cost'=>'Coût total','sale_total'=>'Valeur de vente']],
             'catalogue'=>['title'=>'Catalogue','table'=>'inventory_products','primary'=>null,'editable'=>true,'columns'=>['photo_path'=>'Photo','reference'=>'SKU','name'=>'Produit','category'=>'Catégorie','is_published'=>'Publication','is_featured'=>'Mise en avant','show_price'=>'Prix visible']],
-            'demandes'=>['title'=>'Demandes publiques','table'=>'contact_requests','primary'=>null,'editable'=>false,'columns'=>['name'=>'Nom','contact'=>'Contact','need'=>'Besoin','message'=>'Message','status'=>'Statut','created_at'=>'Reçue le']],
+            'demandes'=>['title'=>'Demandes publiques','table'=>'contact_requests','primary'=>null,'editable'=>false,'viewable'=>true,'columns'=>['name'=>'Nom','contact'=>'Contact','need'=>'Besoin','message'=>'Message','status'=>'Statut','created_at'=>'Reçue le']],
             'ventes'=>['title'=>'Ventes locales','table'=>'local_sales','primary'=>'Nouvelle vente','editable'=>true,'columns'=>['inventory_product_id'=>'Produit','sold_at'=>'Date','quantity'=>'Quantité','total'=>'Total','status'=>'Statut']],
             'depenses'=>['title'=>'Dépenses','table'=>'expenses','primary'=>'Nouvelle dépense','editable'=>true,'columns'=>['spent_at'=>'Date','category'=>'Catégorie','description'=>'Description','type'=>'Type','amount'=>'Montant']],
             'salaires'=>['title'=>'Salaires et IRSA','table'=>'salaries','primary'=>'Préparer un salaire','editable'=>true,'related_action'=>['label'=>'Gérer les employés','href'=>'/modules/employes'],'columns'=>['employee_id'=>'Employé','month'=>'Mois','gross_salary'=>'Brut','irsa_amount'=>'IRSA','net_salary'=>'Net']],
@@ -94,6 +94,7 @@ class ModuleController extends Controller
 
     public function show(string $module, int $id)
     {
+        if($module==='demandes') return $this->showPublicRequest($id);
         if($module==='logistique') return $this->showShipment($id);
         abort_unless($module==='commandes',404);
 
@@ -127,6 +128,14 @@ class ModuleController extends Controller
         $order->public_tracking_url=$order->public_tracking_code?route('public.tracking.link',$order->public_tracking_code):null;
 
         return Inertia::render('Module/OrderShow',['order'=>$order,'items'=>$items,'packages'=>$packages,'company'=>config('madina.company')]);
+    }
+
+    private function showPublicRequest(int $id)
+    {
+        $contactRequest=DB::table('contact_requests')->find($id);
+        abort_unless($contactRequest,404);
+
+        return Inertia::render('Module/PublicRequestShow',['request'=>$contactRequest]);
     }
 
     private function showShipment(int $id)
@@ -779,12 +788,52 @@ class ModuleController extends Controller
 
     private function exportQuery(array $config, string $search='', array $filters=[])
     {
-        $query=DB::table($config['table'])->orderByDesc($config['table'].'.id');
-        if(DB::getSchemaBuilder()->hasColumn($config['table'],'deleted_at')) $query->whereNull($config['table'].'.deleted_at');
-        if($search!=='') $query->where(function($nested) use($search,$config){
-            foreach(array_keys($config['columns']) as $column) if(!str_contains($column,'_id')) $nested->orWhere($column,'like','%'.$search.'%');
+        $table=$config['table'];
+        $query=DB::table($table)->orderByDesc($table.'.id');
+        if(DB::getSchemaBuilder()->hasColumn($table,'deleted_at')) $query->whereNull($table.'.deleted_at');
+        if($search!=='') $query->where(function($nested) use($search,$table){
+            $term='%'.$search.'%';
+            $excluded=['id','password','remember_token','permissions','photo_path','proof_path','gallery_paths','public_tracking_code','old_values','new_values','ip_address','deleted_at'];
+            $columns=array_filter(DB::getSchemaBuilder()->getColumnListing($table),fn($column)=>!in_array($column,$excluded,true)&&!str_ends_with($column,'_id'));
+            foreach($columns as $column) $nested->orWhere($table.'.'.$column,'like',$term);
+
+            $relations=[
+                'client_id'=>['clients',['number','name','contact','address','notes']],
+                'supplier_id'=>['suppliers',['name','category','contact','notes']],
+                'order_id'=>['orders',['number','status','notes']],
+                'invoice_id'=>['invoices',['number','status']],
+                'inventory_product_id'=>['inventory_products',['reference','name','category','short_description','catalog_description']],
+                'employee_id'=>['employees',['name','position']],
+                'user_id'=>['users',['name','email','role']],
+                'assigned_to'=>['users',['name','email','role']],
+                'manager_id'=>['users',['name','email','role']],
+                'quote_id'=>['quotes',['number','client_name','contact','notes']],
+                'quote_request_id'=>['quote_requests',['client_name','client_contact','description','internal_note']],
+            ];
+            foreach($relations as $foreignKey=>[$relatedTable,$relatedColumns]){
+                if(!DB::getSchemaBuilder()->hasColumn($table,$foreignKey)) continue;
+                $nested->orWhereIn($table.'.'.$foreignKey,function($relation) use($relatedTable,$relatedColumns,$term){
+                    $relation->select('id')->from($relatedTable)->where(function($match) use($relatedTable,$relatedColumns,$term){
+                        foreach($relatedColumns as $column) $match->orWhere($relatedTable.'.'.$column,'like',$term);
+                    });
+                });
+            }
+
+            $children=[
+                'quotes'=>['quote_items','quote_id',['name','specifications','supplier_name','supplier_contact','source_url']],
+                'orders'=>['order_items','order_id',['name','specifications','supplier_name','supplier_contact','source_url']],
+                'suppliers'=>['supplier_products','supplier_id',['name','specifications','contact','source_url']],
+            ];
+            if(isset($children[$table])){
+                [$childTable,$foreignKey,$childColumns]=$children[$table];
+                $nested->orWhereIn($table.'.id',function($child) use($childTable,$foreignKey,$childColumns,$term){
+                    $child->select($foreignKey)->from($childTable)->where(function($match) use($childTable,$childColumns,$term){
+                        foreach($childColumns as $column) $match->orWhere($childTable.'.'.$column,'like',$term);
+                    });
+                });
+            }
         });
-        foreach($filters as $field=>$value) $query->where($config['table'].'.'.$field,$value);
+        foreach($filters as $field=>$value) $query->where($table.'.'.$field,$value);
         return $query;
     }
 

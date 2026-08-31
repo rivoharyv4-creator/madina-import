@@ -47,6 +47,23 @@ class DemoDataSeederTest extends TestCase
             ->has('rows',1)
             ->where('rows.0.name','Client Démo 005')
         );
+        $order=DB::table('orders')->first();
+        $client=DB::table('clients')->find($order->client_id);
+        DB::table('orders')->where('id',$order->id)->update(['notes'=>'Recherche interne totalement unique']);
+        $this->actingAs($manager)->get('/modules/commandes?q='.urlencode('Recherche interne totalement unique'))->assertInertia(fn(Assert $page)=>$page
+            ->where('pagination.total',1)
+            ->where('rows.0.id',$order->id)
+        );
+        $this->actingAs($manager)->get('/modules/commandes?q='.urlencode($client->contact))->assertInertia(fn(Assert $page)=>$page
+            ->where('pagination.total',1)
+            ->where('rows.0.id',$order->id)
+        );
+        $item=DB::table('order_items')->where('order_id',$order->id)->first();
+        DB::table('order_items')->where('id',$item->id)->update(['specifications'=>'Finition bleu cobalt unique']);
+        $this->actingAs($manager)->get('/modules/commandes?q='.urlencode('bleu cobalt unique'))->assertInertia(fn(Assert $page)=>$page
+            ->where('pagination.total',1)
+            ->where('rows.0.id',$order->id)
+        );
         $this->actingAs($manager)->get('/modules/devis?filter_status=accepte')->assertInertia(fn(Assert $page)=>$page
             ->where('activeFilters.status','accepte')
             ->where('pagination.total',6)
