@@ -8,10 +8,10 @@ use Illuminate\Http\Request;
 class Authenticate extends Middleware
 {
     /**
-     * Hide private management routes instead of revealing the login URL.
+     * Return expired or unauthenticated management sessions to the private login page.
      */
     protected function redirectTo(Request $request)
     {
-        abort(404);
+        return route('login', absolute: false);
     }
 }

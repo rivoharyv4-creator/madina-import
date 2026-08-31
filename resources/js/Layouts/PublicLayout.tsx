@@ -1,6 +1,6 @@
 import BrandLogo from '@/Components/BrandLogo';
 import { Link } from '@inertiajs/react';
-import { ArrowUpRight, Facebook, Menu, Moon, Phone, Sun, X } from 'lucide-react';
+import { ArrowUpRight, Facebook, Menu, Phone, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export type PublicConfig = {
@@ -66,7 +66,7 @@ export default function PublicLayout({ children, config }: { children: React.Rea
                         aria-pressed={theme === 'dark'}
                         title={theme === 'dark' ? 'Thème clair' : 'Thème sombre'}
                     >
-                        {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+                        <span className="public-theme-toggle-thumb" aria-hidden="true"><span /></span>
                     </button>
                     <a href={whatsapp} target="_blank" rel="noreferrer" className="public-button hidden lg:inline-flex">
                         Demander un devis <ArrowUpRight size={15} />

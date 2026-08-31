@@ -46,7 +46,7 @@ class ExcelExportTest extends TestCase
 
     public function test_excel_export_requires_authentication(): void
     {
-        $this->get('/modules/clients/export')->assertNotFound();
+        $this->get('/modules/clients/export')->assertRedirect(route('login',absolute:false));
     }
 
     public function test_premium_xlsx_export_only_contains_the_active_search_results(): void

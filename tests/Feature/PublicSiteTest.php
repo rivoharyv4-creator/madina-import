@@ -21,14 +21,14 @@ class PublicSiteTest extends TestCase
         $this->seed(DatabaseSeeder::class);
     }
 
-    public function test_public_site_does_not_expose_the_management_login_url(): void
+    public function test_management_routes_redirect_expired_sessions_to_the_private_login_page(): void
     {
         $privateLoginPath = route('login', absolute: false);
 
         $this->get('/')->assertOk()->assertDontSee(ltrim($privateLoginPath, '/'));
         $this->get('/login')->assertNotFound();
         $this->get('/gestion')->assertNotFound();
-        $this->get('/dashboard')->assertNotFound();
+        $this->get('/dashboard')->assertRedirect($privateLoginPath);
         $this->get($privateLoginPath)->assertOk();
     }
 

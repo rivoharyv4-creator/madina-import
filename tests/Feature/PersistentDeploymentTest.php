@@ -29,7 +29,7 @@ class PersistentDeploymentTest extends TestCase
         Storage::fake('persistent');
         Storage::disk('persistent')->put('products/private-product.jpg','photo-content');
 
-        $this->get('/product-photo/private-product.jpg')->assertNotFound();
+        $this->get('/product-photo/private-product.jpg')->assertRedirect(route('login',absolute:false));
 
         $user=User::factory()->create();
         $response=$this->actingAs($user)
