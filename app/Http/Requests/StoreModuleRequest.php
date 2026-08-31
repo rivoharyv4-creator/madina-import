@@ -52,7 +52,10 @@ class StoreModuleRequest extends FormRequest
     {
         $money = ['required', 'numeric', 'min:0', 'max:9999999999999999.99'];
         $optionalMoney = ['nullable', 'numeric', 'min:0', 'max:9999999999999999.99'];
-        $photo = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'];
+        // Keep this below PHP's upload_max_filesize (2 MB in production/local).
+        // A larger Laravel limit lets PHP discard the file before validation,
+        // which makes an Inertia form submission appear to do nothing.
+        $photo = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'];
 
         return match ($this->route('module')) {
             'clients' => ['name'=>['required','string','max:255'],'contact'=>['required','string','max:255'],'type'=>['required','in:revendeur,entrepreneur,particulier,hotel'],'address'=>['nullable','string','max:255'],'notes'=>['nullable','string'],'active'=>['boolean']],
