@@ -67,7 +67,7 @@ class ModuleController extends Controller
                 $filterOptions[]=['field'=>$field,'label'=>$label,'options'=>$values];
             }
         }
-        return Inertia::render('Module/Index',['module'=>$module,'config'=>$config,'rows'=>$rows,'pagination'=>$pagination,'query'=>$request->q,'filterOptions'=>$filterOptions,'activeFilters'=>$activeFilters,'flash'=>session('success')]);
+        return Inertia::render('Module/Index',['module'=>$module,'config'=>$config,'rows'=>$rows,'pagination'=>$pagination,'query'=>$request->q,'filterOptions'=>$filterOptions,'activeFilters'=>$activeFilters]);
     }
 
     public function create(Request $request, string $module)

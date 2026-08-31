@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router } from '@inertiajs/react';
-import { CheckCircle2, Download, ExternalLink, Eye, FileDown, FilePlus2, Inbox, Pencil, Plus, RotateCcw, Search, SlidersHorizontal, Star, UsersRound } from 'lucide-react';
+import { Download, ExternalLink, Eye, FileDown, FilePlus2, Inbox, Pencil, Plus, RotateCcw, Search, SlidersHorizontal, Star, UsersRound } from 'lucide-react';
 import { FormEvent, useEffect, useState } from 'react';
 
 const moneyKeys=['total','amount','price','value','salary','balance','budget'];
@@ -21,7 +21,7 @@ const display=(key:string,value:any)=>{
 type Pagination={current_page:number;last_page:number;per_page:number;total:number;from:number|null;to:number|null};
 type FilterOption={field:string;label:string;options:{value:string;label:string}[]};
 
-export default function Index({module,config,rows,pagination,query,filterOptions=[],activeFilters={},flash}:{module:string;config:any;rows:any[];pagination:Pagination;query?:string;filterOptions?:FilterOption[];activeFilters?:Record<string,string>;flash?:string}){
+export default function Index({module,config,rows,pagination,query,filterOptions=[],activeFilters={}}:{module:string;config:any;rows:any[];pagination:Pagination;query?:string;filterOptions?:FilterOption[];activeFilters?:Record<string,string>}){
  const [q,setQ]=useState(query||'');
  const [filters,setFilters]=useState<Record<string,string>>(activeFilters);
  const filterKey=JSON.stringify(filters),serverFilterKey=JSON.stringify(activeFilters);
@@ -36,7 +36,6 @@ export default function Index({module,config,rows,pagination,query,filterOptions
   action={(config.primary||config.related_action)?<div className="flex flex-wrap items-center gap-2">{config.related_action&&<Link href={config.related_action.href} className="btn-secondary"><UsersRound size={17}/>{config.related_action.label}</Link>}{config.primary&&<Link href={`/modules/${module}/create`} className="btn-primary"><Plus size={17}/>{config.primary}</Link>}</div>:undefined}
  >
   <Head title={config.title}/>
-  {flash&&<div className="mb-4 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700"><CheckCircle2 size={18}/>{flash}</div>}
   <section className="panel overflow-hidden !p-0">
    <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 p-4">
     <form onSubmit={submit} className="relative min-w-[240px] flex-1"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/><input value={q} onChange={event=>setQ(event.target.value)} className="field pl-9" placeholder={`Rechercher dans ${config.title.toLowerCase()}…`}/></form>

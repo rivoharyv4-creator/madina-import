@@ -17,7 +17,6 @@ class UserManagementController extends Controller
         return Inertia::render('Users/Index', [
             'users' => User::query()->orderByRaw("role = 'super_admin' desc")->orderBy('name')->get(['id','name','email','role','permissions','active','created_at']),
             'menuOptions' => collect(config('access.menus'))->map(fn($label,$value)=>compact('value','label'))->values(),
-            'flash' => session('success'),
         ]);
     }
 

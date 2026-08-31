@@ -9,7 +9,7 @@ type FormData={name:string;email:string;role:'assistant'|'user';password:string;
 
 const empty:FormData={name:'',email:'',role:'assistant',password:'',permissions:[],active:true};
 
-export default function UsersIndex({users,menuOptions,flash}:{users:ManagedUser[];menuOptions:MenuOption[];flash?:string}){
+export default function UsersIndex({users,menuOptions}:{users:ManagedUser[];menuOptions:MenuOption[]}){
  const [editing,setEditing]=useState<number|null>(null);
  const {data,setData,post,put,processing,errors,reset,clearErrors}=useForm<FormData>(empty);
  const startCreate=()=>{setEditing(null);reset();clearErrors();};
@@ -19,7 +19,6 @@ export default function UsersIndex({users,menuOptions,flash}:{users:ManagedUser[
 
  return <AuthenticatedLayout header={<><p className="eyebrow">Administration</p><h1 className="page-title">Utilisateurs & accès</h1><p className="mt-1 text-sm text-gray-400">Créez les comptes de votre équipe et choisissez précisément les menus accessibles.</p></>}>
   <Head title="Utilisateurs & accès"/>
-  {flash&&<div className="mb-5 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700"><Check size={17}/>{flash}</div>}
   <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_430px]">
    <section className="panel overflow-hidden p-0">
     <div className="panel-head border-b border-gray-100 p-5"><div><h2>Comptes de l’équipe</h2><p>{users.length} utilisateur{users.length>1?'s':''} enregistré{users.length>1?'s':''}</p></div><button type="button" onClick={startCreate} className="btn-primary"><UserPlus size={16}/>Ajouter</button></div>

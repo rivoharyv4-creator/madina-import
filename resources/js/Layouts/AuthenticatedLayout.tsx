@@ -1,7 +1,7 @@
 import { Link, usePage } from '@inertiajs/react';
 import BrandLogo from '@/Components/BrandLogo';
-import { PropsWithChildren, ReactNode, useState } from 'react';
-import { Bell, BookOpen, Boxes, ChartNoAxesCombined, ChevronDown, ClipboardList, Factory, FileText, Gauge, Landmark, LogOut, Menu, PackageCheck, ReceiptText, Scale, Search, Settings, Ship, ShoppingCart, Store, UserCog, UserRound, Users, WalletCards, X, BadgeDollarSign } from 'lucide-react';
+import { PropsWithChildren, ReactNode, useEffect, useState } from 'react';
+import { Bell, BookOpen, Boxes, ChartNoAxesCombined, CheckCircle2, ChevronDown, ClipboardList, Factory, FileText, Gauge, Landmark, LogOut, Menu, PackageCheck, ReceiptText, Scale, Search, Settings, Ship, ShoppingCart, Store, UserCog, UserRound, Users, WalletCards, X, BadgeDollarSign } from 'lucide-react';
 
 const nav = [
  ['Demandes publiques','/modules/demandes',ClipboardList],
@@ -9,12 +9,15 @@ const nav = [
 ] as const;
 
 export default function Authenticated({ header, children, action }: PropsWithChildren<{header?:ReactNode; action?:ReactNode}>) {
- const [open,setOpen]=useState(false); const {auth}=usePage().props as any; const path=window.location.pathname;
+ const [open,setOpen]=useState(false); const {auth,flash}=usePage().props as any; const path=window.location.pathname;
+ const [toast,setToast]=useState<string|null>(flash?.success||null);
+ useEffect(()=>{if(!flash?.success)return;setToast(flash.success);const timer=window.setTimeout(()=>setToast(null),3500);return()=>window.clearTimeout(timer);},[flash?.success]);
  const superAdmin=auth?.user?.role==='super_admin';
  const allowed=(href:string)=>superAdmin||auth?.user?.permissions?.includes(href==='/dashboard'?'dashboard':href.replace('/modules/',''));
  const visibleNav=nav.filter(([,href])=>allowed(href));
  const roleLabel=superAdmin?'Super administrateur':auth?.user?.role==='assistant'?'Assistant':'Utilisateur';
  return <div className="min-h-screen bg-[#F8F8F6] text-[#2F2F2F]">
+  {toast&&<div role="status" aria-live="polite" className="fixed right-4 top-4 z-[70] flex max-w-sm items-start gap-3 rounded-xl border border-emerald-200 bg-white px-4 py-3 text-emerald-800 shadow-[0_18px_55px_rgba(47,47,47,.18)] md:right-6 md:top-6"><span className="grid size-9 shrink-0 place-items-center rounded-lg bg-emerald-50"><CheckCircle2 size={19}/></span><div className="min-w-0 flex-1"><strong className="block text-sm">Enregistrement effectué</strong><p className="mt-0.5 text-xs leading-5 text-emerald-700">{toast}</p></div><button type="button" onClick={()=>setToast(null)} aria-label="Fermer la notification" className="rounded-md p-1 text-emerald-500 hover:bg-emerald-50"><X size={15}/></button></div>}
   {open&&<button aria-label="Fermer" className="fixed inset-0 z-30 bg-black/30 lg:hidden" onClick={()=>setOpen(false)}/>} 
   <aside className={`fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col bg-[#2F2F2F] text-white transition-transform print:hidden lg:translate-x-0 ${open?'translate-x-0':'-translate-x-full'}`}>
    <div className="flex h-[96px] items-center justify-between border-b border-white/10 px-5"><Link href="/dashboard" className="flex items-center gap-2"><BrandLogo className="h-[72px] w-[86px] shrink-0"/><span><strong className="block text-[14px] tracking-wide text-[#FCF108]">MADINA IMPORT</strong><small className="text-[10px] text-white/55">Gestion & importation</small></span></Link><button onClick={()=>setOpen(false)} className="lg:hidden"><X size={20}/></button></div>
