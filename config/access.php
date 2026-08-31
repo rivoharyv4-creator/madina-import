@@ -3,6 +3,7 @@
 return [
     'menus' => [
         'dashboard' => 'Tableau de bord',
+        'demandes' => 'Demandes publiques',
         'clients' => 'Clients',
         'demandes-devis' => 'Demandes de devis',
         'devis' => 'Devis',
