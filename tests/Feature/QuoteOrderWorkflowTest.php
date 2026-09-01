@@ -66,15 +66,16 @@ class QuoteOrderWorkflowTest extends TestCase
         $quote=DB::table('quotes')->where('number','DV-MI-2026-001')->first();
         $quoteItem=DB::table('quote_items')->where('quote_id',$quote->id)->first();
         DB::table('quote_items')->where('id',$quoteItem->id)->update(['photo_path'=>'products/from-quote.jpg','supplier_name'=>'Fournisseur devis','supplier_contact'=>'WeChat 123']);
+        $orderLineTotal=((float)$quoteItem->supplier_price+(float)$quoteItem->china_delivery+(float)$quoteItem->packaging+(float)$quoteItem->estimated_freight+(float)$quoteItem->margin)*(float)$quoteItem->quantity;
 
         $this->actingAs($this->manager)->get('/modules/commandes/create')->assertInertia(fn(Assert $page)=>$page
             ->where('quoteTemplates.'.$quote->id.'.number',$quote->number)
-            ->where('quoteTemplates.'.$quote->id.'.items.0.client_total',(int)$quoteItem->total)
+            ->where('quoteTemplates.'.$quote->id.'.items.0.client_total',(int)$orderLineTotal)
         );
 
         $this->actingAs($this->manager)->post('/modules/commandes',[
             'quote_id'=>$quote->id,'client_id'=>$quote->client_id,'ordered_at'=>'2026-08-25','shipping_mode'=>'maritime','status'=>'acompte_recu','deposit'=>1000000,'commission_enabled'=>1,'commission_rate'=>8,'items'=>[[
-                'quote_item_id'=>$quoteItem->id,'name'=>$quoteItem->name,'quantity'=>$quoteItem->quantity,'supplier_id'=>$quoteItem->supplier_id,'supplier_name'=>'Fournisseur devis','supplier_contact'=>'WeChat 123','supplier_price'=>$quoteItem->supplier_price,'china_delivery'=>$quoteItem->china_delivery,'packaging'=>$quoteItem->packaging,'weight'=>$quoteItem->estimated_weight,'cbm'=>$quoteItem->estimated_cbm,'freight'=>$quoteItem->estimated_freight,'margin'=>$quoteItem->margin,'commission'=>$quoteItem->commission,'client_total'=>$quoteItem->total,
+                'quote_item_id'=>$quoteItem->id,'name'=>$quoteItem->name,'quantity'=>$quoteItem->quantity,'supplier_id'=>$quoteItem->supplier_id,'supplier_name'=>'Fournisseur devis','supplier_contact'=>'WeChat 123','supplier_price'=>$quoteItem->supplier_price,'china_delivery'=>$quoteItem->china_delivery,'packaging'=>$quoteItem->packaging,'weight'=>$quoteItem->estimated_weight,'cbm'=>$quoteItem->estimated_cbm,'freight'=>$quoteItem->estimated_freight,'margin'=>$quoteItem->margin,'commission'=>$quoteItem->commission,'client_total'=>(float)$quoteItem->total/(float)$quoteItem->quantity,
             ]],
         ])->assertRedirect('/modules/commandes');
 

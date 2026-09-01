@@ -14,9 +14,11 @@ class DashboardTest extends TestCase
     {
         $user = User::factory()->create(['email_verified_at'=>now()]);
         $this->actingAs($user)->get('/dashboard')->assertOk();
-        foreach (['clients','devis','commandes','paiements','factures','fournisseurs','achats','logistique','stock','ventes','depenses','salaires','fiscalite','rapports','parametres'] as $module) {
+        foreach (['clients','devis','commandes','paiements','factures','fournisseurs','achats','logistique','stock','depenses','salaires','fiscalite','rapports','parametres'] as $module) {
             $this->actingAs($user)->get('/modules/'.$module)->assertOk();
         }
+        $this->actingAs($user)->get('/modules/bons-livraison')->assertOk();
+        $this->actingAs($user)->get('/modules/ventes')->assertNotFound();
     }
 
     public function test_public_registration_is_disabled(): void

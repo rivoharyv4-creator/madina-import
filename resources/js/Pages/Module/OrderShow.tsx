@@ -1,7 +1,7 @@
 import BrandLogo from '@/Components/BrandLogo';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowLeft, Box, CalendarDays, Copy, ExternalLink, FilePlus2, PackageCheck, Pencil, Printer, RefreshCw, ShieldCheck, ShieldOff, Ship, UserRound } from 'lucide-react';
+import { ArrowLeft, Box, CalendarDays, Copy, ExternalLink, FilePlus2, PackageCheck, Pencil, Printer, RefreshCw, ShieldCheck, ShieldOff, Ship, Truck, UserRound } from 'lucide-react';
 import { useState } from 'react';
 
 const money=(value:any)=>new Intl.NumberFormat('de-DE',{maximumFractionDigits:0}).format(Number(value||0))+' Ar';
@@ -16,7 +16,7 @@ export default function OrderShow({order,items,packages,company}:{order:any;item
  const copyTracking=async()=>{if(!order.public_tracking_url)return;await navigator.clipboard.writeText(order.public_tracking_url);setCopied(true);window.setTimeout(()=>setCopied(false),1800);};
  return <AuthenticatedLayout
   header={<><Link href="/modules/commandes" className="mb-3 inline-flex items-center gap-2 text-xs font-semibold text-gray-400 hover:text-[#BD2433]"><ArrowLeft size={14}/>Retour aux commandes</Link><p className="eyebrow">Aperçu de la commande</p><h1 className="page-title">{order.number}</h1><p className="mt-1 text-sm text-gray-400">Produits réels, photos, colis et informations financières.</p></>}
-  action={<div className="flex flex-wrap gap-2 print:hidden"><button type="button" onClick={()=>window.print()} className="btn-secondary"><Printer size={16}/>Imprimer</button><Link href={`/modules/factures/create?order_id=${order.id}`} className="btn-secondary"><FilePlus2 size={16}/>Créer une facture</Link><Link href={`/modules/commandes/${order.id}/edit`} className="btn-primary"><Pencil size={16}/>Modifier</Link></div>}
+  action={<div className="flex flex-wrap gap-2 print:hidden"><button type="button" onClick={()=>window.print()} className="btn-secondary"><Printer size={16}/>Imprimer</button><Link href={`/modules/bons-livraison/create?order_id=${order.id}`} className="btn-secondary"><Truck size={16}/>Générer un BL</Link><Link href={`/modules/factures/create?order_id=${order.id}`} className="btn-secondary"><FilePlus2 size={16}/>Créer une facture</Link><Link href={`/modules/commandes/${order.id}/edit`} className="btn-primary"><Pencil size={16}/>Modifier</Link></div>}
  >
   <Head title={`Commande ${order.number}`}/>
   <div className="order-print mx-auto max-w-6xl space-y-5">

@@ -14,6 +14,7 @@ class SecureFileController extends Controller
         'invoice'=>'invoices',
         'quote'=>'quotes',
         'logistics'=>'logistics',
+        'delivery'=>'deliveries',
     ];
 
     public function product(string $filename): StreamedResponse

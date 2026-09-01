@@ -9,7 +9,7 @@ final class NumberSequenceService
     public function next(string $type, ?int $year = null): string
     {
         $year ??= (int) now()->format('Y');
-        $prefix = ['quote' => 'DV-MI', 'order' => 'MI', 'invoice' => 'FA-MI', 'fee_invoice' => 'FF-MI', 'product' => 'PRD', 'client' => 'CLI'][$type] ?? strtoupper($type);
+        $prefix = ['quote' => 'DV-MI', 'order' => 'MI', 'invoice' => 'FA-MI', 'fee_invoice' => 'FF-MI', 'delivery_note'=>'BL-MI', 'product' => 'PRD', 'client' => 'CLI'][$type] ?? strtoupper($type);
 
         return DB::transaction(function () use ($type, $year, $prefix) {
             $row = DB::table('number_sequences')->where(compact('type', 'year'))->lockForUpdate()->first();

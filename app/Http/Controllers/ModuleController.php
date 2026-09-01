@@ -35,12 +35,11 @@ class ModuleController extends Controller
             'paiements'=>['title'=>'Paiements clients','table'=>'client_payments','primary'=>'Nouveau paiement','editable'=>true,'columns'=>['client_id'=>'Client','paid_at'=>'Date','amount'=>'Montant','method'=>'Mode','status'=>'Statut']],
             'factures'=>['title'=>'Factures','table'=>'invoices','primary'=>'Nouvelle facture','editable'=>true,'columns'=>['number'=>'N° facture','type'=>'Type','subtotal'=>'Total','issued_at'=>'Date','status'=>'Statut']],
             'fournisseurs'=>['title'=>'Fournisseurs','table'=>'suppliers','primary'=>'Nouveau fournisseur','editable'=>true,'columns'=>['name'=>'Fournisseur','category'=>'Catégorie','contact'=>'Contact','quality_rating'=>'Qualité','active'=>'Statut']],
-            'achats'=>['title'=>'Achats fournisseurs','table'=>'supplier_payments','primary'=>'Nouveau paiement','editable'=>true,'columns'=>['supplier_id'=>'Fournisseur','paid_at'=>'Date','amount'=>'Montant','method'=>'Mode','proof_path'=>'Justificatif','status'=>'Statut']],
+            'achats'=>['title'=>'Achats fournisseurs','table'=>'supplier_payments','primary'=>'Nouveau paiement','editable'=>true,'columns'=>['supplier_id'=>'Fournisseur','paid_at'=>'Date','quantity'=>'Quantité','unit_price'=>'Prix unitaire','amount'=>'Montant total payé','method'=>'Mode','proof_path'=>'Justificatif','status'=>'Statut']],
             'logistique'=>['title'=>'Suivi Logistique','table'=>'shipments','primary'=>'Nouveau suivi logistique','editable'=>true,'columns'=>['order_id'=>'N° commande','tracking'=>'Tracking number','forwarder'=>'Transitaire','container_reference'=>'Référence conteneur','expected_madagascar_at'=>'Arrivage prévu','cbm'=>'CBM / volume','package_count'=>'Colis','carton_count'=>'Cartons','cost'=>'Frais de fret','status'=>'Statut']],
             'stock'=>['title'=>'Stock','table'=>'inventory_products','primary'=>'Ajouter un produit','editable'=>true,'columns'=>['photo_path'=>'Photo','reference'=>'SKU','name'=>'Produit','quantity'=>'Stock','reserved_quantity'=>'Réservée','available_quantity'=>'Disponible','total_purchase_cost'=>'Coût total','sale_total'=>'Valeur de vente']],
             'catalogue'=>['title'=>'Catalogue','table'=>'inventory_products','primary'=>null,'editable'=>true,'columns'=>['photo_path'=>'Photo','reference'=>'SKU','name'=>'Produit','category'=>'Catégorie','is_published'=>'Publication','is_featured'=>'Mise en avant','show_price'=>'Prix visible']],
             'demandes'=>['title'=>'Demandes publiques','table'=>'contact_requests','primary'=>null,'editable'=>false,'viewable'=>true,'columns'=>['name'=>'Nom','contact'=>'Contact','need'=>'Besoin','message'=>'Message','status'=>'Statut','created_at'=>'Reçue le']],
-            'ventes'=>['title'=>'Ventes locales','table'=>'local_sales','primary'=>'Nouvelle vente','editable'=>true,'columns'=>['inventory_product_id'=>'Produit','sold_at'=>'Date','quantity'=>'Quantité','total'=>'Total','status'=>'Statut']],
             'depenses'=>['title'=>'Dépenses','table'=>'expenses','primary'=>'Nouvelle dépense','editable'=>true,'columns'=>['spent_at'=>'Date','category'=>'Catégorie','description'=>'Description','type'=>'Type','amount'=>'Montant']],
             'salaires'=>['title'=>'Salaires et IRSA','table'=>'salaries','primary'=>'Préparer un salaire','editable'=>true,'related_action'=>['label'=>'Gérer les employés','href'=>'/modules/employes'],'columns'=>['employee_id'=>'Employé','month'=>'Mois','gross_salary'=>'Brut','irsa_amount'=>'IRSA','net_salary'=>'Net']],
             'employes'=>['title'=>'Employés','table'=>'employees','primary'=>'Nouvel employé','editable'=>true,'related_action'=>['label'=>'Retour aux salaires','href'=>'/modules/salaires'],'columns'=>['name'=>'Nom et prénom','position'=>'Poste','monthly_salary'=>'Salaire habituel','irsa_mode'=>'Mode IRSA','active'=>'Statut']],
@@ -330,7 +329,7 @@ class ModuleController extends Controller
     private function createQuote(array $data, NumberSequenceService $numbers): int
     {
         if(empty($data['client_id'])) $data['client_id']=DB::table('clients')->insertGetId(['number'=>$numbers->next('client'),'name'=>$data['client_name'],'contact'=>$data['client_contact'],'type'=>$data['client_type'],'address'=>null,'notes'=>'Créé directement depuis un devis','active'=>true,'credit_balance'=>0,'created_at'=>now(),'updated_at'=>now()]);
-        $client=DB::table('clients')->find($data['client_id']); $supplierTotal=collect($data['items'])->sum(fn($item)=>(float)$item['supplier_price']*(float)$item['quantity']); $logistics=collect($data['items'])->sum(fn($item)=>(float)($item['china_delivery']??0)+(float)($item['packaging']??0)+(float)($item['freight']??0)); $margin=collect($data['items'])->sum(fn($item)=>(float)($item['margin']??0)); $total=collect($data['items'])->sum(fn($item)=>$this->quoteItemSalePrice($item));
+        $client=DB::table('clients')->find($data['client_id']); $supplierTotal=collect($data['items'])->sum(fn($item)=>(float)$item['supplier_price']*(float)$item['quantity']); $logistics=collect($data['items'])->sum(fn($item)=>((float)($item['china_delivery']??0)+(float)($item['packaging']??0)+(float)($item['freight']??0))*(float)$item['quantity']); $margin=collect($data['items'])->sum(fn($item)=>(float)($item['margin']??0)*(float)$item['quantity']); $total=collect($data['items'])->sum(fn($item)=>$this->quoteItemSalePrice($item));
         $id=DB::table('quotes')->insertGetId(['number'=>$numbers->next('quote'),'client_id'=>$client->id,'client_name'=>$data['client_name'],'contact'=>$data['client_contact'],'client_type'=>$client->type,'sent_at'=>$data['status']==='brouillon'?null:today(),'valid_until'=>$data['valid_until'],'shipping_mode'=>$data['shipping_mode'],'shipping_delay'=>$data['shipping_delay']??null,'bank_details'=>$data['bank_details']??null,'payment_terms'=>$data['payment_terms']??null,'warranty'=>$data['warranty']??null,'status'=>$data['status'],'supplier_estimate'=>$supplierTotal,'logistics_estimate'=>$logistics,'margin'=>$margin,'total'=>$total,'currency'=>'MGA','notes'=>$data['notes']??null,'created_at'=>now(),'updated_at'=>now()]);
         $this->insertQuoteItems($id,$data['items']);
         return $id;
@@ -341,9 +340,11 @@ class ModuleController extends Controller
         if(!empty($data['new_client_name'])) $data['client_id']=DB::table('clients')->insertGetId(['number'=>$numbers->next('client'),'name'=>$data['new_client_name'],'contact'=>$data['new_client_contact'],'type'=>$data['new_client_type'],'address'=>$data['new_client_address']??null,'notes'=>'Créé directement depuis une commande','active'=>true,'credit_balance'=>0,'created_at'=>now(),'updated_at'=>now()]);
         $total=collect($data['items'])->sum(fn($item)=>(float)$item['client_total']); $deposit=(float)($data['deposit']??0); if($deposit>$total) throw ValidationException::withMessages(['deposit'=>'L’acompte ne peut pas dépasser le total client.']); $supplierTotal=collect($data['items'])->sum(fn($item)=>(float)$item['supplier_price']*(float)$item['quantity']); $freight=collect($data['items'])->sum(fn($item)=>(float)($item['freight']??0)); $margin=collect($data['items'])->sum(fn($item)=>(float)($item['margin']??0)); $cbm=collect($data['packages']??[])->sum(fn($package)=>(float)($package['volume_cbm']??0))?:collect($data['items'])->sum(fn($item)=>(float)($item['cbm']??0));
         $commissionEnabled=(bool)($data['commission_enabled']??false); $commission=$commissionEnabled?collect($data['items'])->sum(fn($item)=>(float)($item['commission']??0)):0;
-        $id=DB::table('orders')->insertGetId(['number'=>$numbers->next('order'),'client_id'=>$data['client_id'],'quote_id'=>$data['quote_id']??null,'manager_id'=>$managerId,'origin'=>!empty($data['quote_id'])?'devis':'directe','ordered_at'=>$data['ordered_at'],'shipping_mode'=>$data['shipping_mode']??null,'cbm'=>$cbm,'freight'=>$freight,'supplier_total'=>$supplierTotal,'commission_enabled'=>$commissionEnabled,'commission_base'=>$supplierTotal,'commission_rate'=>$data['commission_rate']??8,'commission_amount'=>$commission,'margin'=>$margin,'client_total'=>$total,'deposit'=>$deposit,'balance_due'=>$total-$deposit,'status'=>$data['status'],'notes'=>$data['notes']??null,'created_at'=>now(),'updated_at'=>now()]);
+        $number=$numbers->next('order');
+        $id=DB::table('orders')->insertGetId(['number'=>$number,'client_id'=>$data['client_id'],'quote_id'=>$data['quote_id']??null,'manager_id'=>$managerId,'origin'=>!empty($data['quote_id'])?'devis':'directe','ordered_at'=>$data['ordered_at'],'shipping_mode'=>$data['shipping_mode']??null,'cbm'=>$cbm,'freight'=>$freight,'supplier_total'=>$supplierTotal,'commission_enabled'=>$commissionEnabled,'commission_base'=>$supplierTotal,'commission_rate'=>$data['commission_rate']??8,'commission_amount'=>$commission,'margin'=>$margin,'client_total'=>$total,'deposit'=>$deposit,'balance_due'=>$total-$deposit,'status'=>$data['status'],'notes'=>$data['notes']??null,'created_at'=>now(),'updated_at'=>now()]);
         $itemIds=$this->insertOrderItems($id,$data['items'],$commissionEnabled,$data['status']);
         $this->insertPackages($id,$data['packages']??[],$itemIds,$data['items']);
+        $this->syncOrderStock([],false,$data['items'],$this->orderUsesStock($data['status']),$managerId,$number);
         return $id;
     }
 
@@ -363,12 +364,11 @@ class ModuleController extends Controller
 
     private function quoteItemSalePrice(array $item): float
     {
-        return (float)$item['supplier_price']*(float)$item['quantity']
+        return ((float)$item['supplier_price']
             +(float)($item['china_delivery']??0)
             +(float)($item['packaging']??0)
             +(float)($item['freight']??0)
-            +(float)($item['margin']??0)
-            +(float)($item['commission']??0);
+            +(float)($item['margin']??0))*(float)$item['quantity'];
     }
 
     private function insertOrderItems(int $orderId, array $items, bool $commissionEnabled, string $status, array $existingPhotos=[]): array
@@ -377,7 +377,8 @@ class ModuleController extends Controller
         foreach($items as $item) {
             $photo=$item['photo']??null; $quotePhoto=!empty($item['quote_item_id'])?DB::table('quote_items')->where('id',$item['quote_item_id'])->value('photo_path'):null; $existing=$existingPhotos[$item['id']??0]??$quotePhoto;
             $supplier=!empty($item['supplier_id'])?DB::table('suppliers')->find($item['supplier_id']):null;
-            $ids[]=DB::table('order_items')->insertGetId(['order_id'=>$orderId,'supplier_id'=>$item['supplier_id']??null,'supplier_name'=>$item['supplier_name']??$supplier?->name,'supplier_contact'=>$item['supplier_contact']??$supplier?->contact,'name'=>$item['name'],'specifications'=>$item['specifications']??null,'quantity'=>$item['quantity'],'source_url'=>$item['source_url']??null,'photo_path'=>$photo?$this->storePhoto($photo):$existing,'supplier_price'=>$item['supplier_price'],'china_delivery'=>$item['china_delivery']??0,'packaging'=>$item['packaging']??0,'weight'=>$item['weight']??null,'cbm'=>$item['cbm']??null,'freight'=>$item['freight']??0,'margin'=>$item['margin']??0,'commission'=>$commissionEnabled?($item['commission']??0):0,'client_total'=>$item['client_total'],'status'=>$status,'created_at'=>now(),'updated_at'=>now()]);
+            $inventory=!empty($item['inventory_product_id'])?DB::table('inventory_products')->whereNull('deleted_at')->find($item['inventory_product_id']):null;
+            $ids[]=DB::table('order_items')->insertGetId(['order_id'=>$orderId,'inventory_product_id'=>$inventory?->id,'supplier_id'=>$item['supplier_id']??null,'supplier_name'=>$item['supplier_name']??$supplier?->name,'supplier_contact'=>$item['supplier_contact']??$supplier?->contact,'name'=>$item['name'],'specifications'=>$item['specifications']??null,'quantity'=>$item['quantity'],'source_url'=>$item['source_url']??null,'photo_path'=>$photo?$this->storePhoto($photo):($existing??$inventory?->photo_path),'supplier_price'=>$item['supplier_price'],'china_delivery'=>$item['china_delivery']??0,'packaging'=>$item['packaging']??0,'weight'=>$item['weight']??null,'cbm'=>$item['cbm']??null,'freight'=>$item['freight']??0,'margin'=>$item['margin']??0,'commission'=>$commissionEnabled?($item['commission']??0):0,'client_total'=>$item['client_total'],'status'=>$status,'created_at'=>now(),'updated_at'=>now()]);
         }
         return $ids;
     }
@@ -476,14 +477,16 @@ class ModuleController extends Controller
         if($module==='stock') { $this->updateStock($id,$old,$data,$userId); return; }
         if($module==='catalogue') { $this->updateCatalogue($id,$old,$data); return; }
         if($module==='devis') {
-            $client=DB::table('clients')->find($data['client_id']); $supplierTotal=collect($data['items'])->sum(fn($item)=>(float)$item['supplier_price']*(float)$item['quantity']); $logistics=collect($data['items'])->sum(fn($item)=>(float)($item['china_delivery']??0)+(float)($item['packaging']??0)+(float)($item['freight']??0)); $margin=collect($data['items'])->sum(fn($item)=>(float)($item['margin']??0)); $total=collect($data['items'])->sum(fn($item)=>$this->quoteItemSalePrice($item));
+            $client=DB::table('clients')->find($data['client_id']); $supplierTotal=collect($data['items'])->sum(fn($item)=>(float)$item['supplier_price']*(float)$item['quantity']); $logistics=collect($data['items'])->sum(fn($item)=>((float)($item['china_delivery']??0)+(float)($item['packaging']??0)+(float)($item['freight']??0))*(float)$item['quantity']); $margin=collect($data['items'])->sum(fn($item)=>(float)($item['margin']??0)*(float)$item['quantity']); $total=collect($data['items'])->sum(fn($item)=>$this->quoteItemSalePrice($item));
             DB::table('quotes')->where('id',$id)->update(['client_id'=>$client->id,'client_name'=>$data['client_name'],'contact'=>$data['client_contact'],'client_type'=>$client->type,'sent_at'=>$data['status']==='brouillon'?null:($old->sent_at??today()),'valid_until'=>$data['valid_until'],'shipping_mode'=>$data['shipping_mode'],'shipping_delay'=>$data['shipping_delay']??null,'bank_details'=>$data['bank_details']??null,'payment_terms'=>$data['payment_terms']??null,'warranty'=>$data['warranty']??null,'notes'=>$data['notes']??null,'status'=>$data['status'],'supplier_estimate'=>$supplierTotal,'logistics_estimate'=>$logistics,'margin'=>$margin,'total'=>$total,'updated_at'=>now()]);
             $photos=DB::table('quote_items')->where('quote_id',$id)->pluck('photo_path','id')->all(); DB::table('quote_items')->where('quote_id',$id)->delete(); $this->insertQuoteItems($id,$data['items'],$photos); return;
         }
         if($module==='commandes') {
             $total=collect($data['items'])->sum(fn($item)=>(float)$item['client_total']); $deposit=(float)($data['deposit']??0); if($deposit>$total) throw ValidationException::withMessages(['deposit'=>'L’acompte ne peut pas dépasser le total client.']); $supplierTotal=collect($data['items'])->sum(fn($item)=>(float)$item['supplier_price']*(float)$item['quantity']); $freight=collect($data['items'])->sum(fn($item)=>(float)($item['freight']??0)); $margin=collect($data['items'])->sum(fn($item)=>(float)($item['margin']??0)); $cbm=collect($data['packages']??[])->sum(fn($package)=>(float)($package['volume_cbm']??0))?:collect($data['items'])->sum(fn($item)=>(float)($item['cbm']??0)); $enabled=(bool)($data['commission_enabled']??false); $commission=$enabled?collect($data['items'])->sum(fn($item)=>(float)($item['commission']??0)):0;
+            $oldItems=DB::table('order_items')->where('order_id',$id)->get();
+            $this->syncOrderStock($oldItems,$this->orderUsesStock($old->status),$data['items'],$this->orderUsesStock($data['status']),$userId,$old->number);
             DB::table('orders')->where('id',$id)->update(['client_id'=>$data['client_id'],'quote_id'=>$data['quote_id']??null,'origin'=>!empty($data['quote_id'])?'devis':'directe','ordered_at'=>$data['ordered_at'],'shipping_mode'=>$data['shipping_mode']??null,'cbm'=>$cbm,'freight'=>$freight,'supplier_total'=>$supplierTotal,'commission_enabled'=>$enabled,'commission_base'=>$supplierTotal,'commission_rate'=>$data['commission_rate']??8,'commission_amount'=>$commission,'margin'=>$margin,'client_total'=>$total,'deposit'=>$deposit,'balance_due'=>$total-$deposit,'status'=>$data['status'],'notes'=>$data['notes']??null,'updated_at'=>now()]);
-            $photos=DB::table('order_items')->where('order_id',$id)->pluck('photo_path','id')->all(); DB::table('order_packages')->where('order_id',$id)->delete(); DB::table('order_items')->where('order_id',$id)->delete(); $itemIds=$this->insertOrderItems($id,$data['items'],$enabled,$data['status'],$photos); $this->insertPackages($id,$data['packages']??[],$itemIds,$data['items']); return;
+            $photos=$oldItems->pluck('photo_path','id')->all(); DB::table('order_packages')->where('order_id',$id)->delete(); DB::table('order_items')->where('order_id',$id)->delete(); $itemIds=$this->insertOrderItems($id,$data['items'],$enabled,$data['status'],$photos); $this->insertPackages($id,$data['packages']??[],$itemIds,$data['items']); return;
         }
         if($module==='paiements') { $data=Arr::except($data,['new_client_name','new_client_contact','new_client_type','new_client_address']); $data=$this->encodePaymentReason($data); $amount=(float)$data['amount']; $allocated=$this->paymentAllocation($data); $this->reversePaymentEffects($old); DB::table('client_payments')->where('id',$id)->update([...$data,'allocated_amount'=>$allocated,'status'=>'valide','updated_at'=>now()]); $this->applyPaymentEffects((object)[...$data,'amount'=>$amount,'allocated_amount'=>$allocated]); return; }
         if($module==='factures') { $order=DB::table('orders')->find($data['order_id']); $subtotal=(float)$data['subtotal']; $paid=(float)($data['paid_amount']??0); if($paid>$subtotal) throw ValidationException::withMessages(['paid_amount'=>'Le montant reçu ne peut pas dépasser le total.']); DB::table('invoices')->where('id',$id)->update(['order_id'=>$order->id,'client_id'=>$order->client_id,'type'=>$data['type'],'issued_at'=>$data['issued_at'],'subtotal'=>$subtotal,'paid_amount'=>$paid,'balance_due'=>$subtotal-$paid,'status'=>$paid>=$subtotal?'payee':($paid>0?'partielle':$data['status']),'lines'=>json_encode([['label'=>$data['type']==='frais'?'Frais de commande':'Produits commandés','amount'=>$subtotal]]),'updated_at'=>now()]); return; }
@@ -492,6 +495,63 @@ class ModuleController extends Controller
         if($module==='salaires') { $calc=$calculator->salary($data['gross_salary'],$data['irsa_mode'],$data['irsa_value']??0); DB::table('salaries')->where('id',$id)->update(['employee_id'=>$data['employee_id'],'month'=>date('Y-m-01',strtotime($data['month'])),'gross_salary'=>$data['gross_salary'],'irsa_mode'=>$data['irsa_mode'],'irsa_rate'=>$data['irsa_mode']==='pourcentage'?$data['irsa_value']:null,'irsa_amount'=>$calc['irsa'],'net_salary'=>$calc['net'],'paid_at'=>$data['paid_at']??null,'status'=>$data['status'],'updated_at'=>now()]); DB::table('expenses')->where('source_type','salary')->where('source_id',$id)->update(['amount'=>$calc['net'],'spent_at'=>$data['paid_at']??today(),'updated_at'=>now()]); DB::table('expenses')->where('source_type','salary_irsa')->where('source_id',$id)->update(['amount'=>$calc['irsa'],'spent_at'=>$data['paid_at']??today(),'updated_at'=>now()]); return; }
         if($module==='fiscalite') { DB::table('tax_records')->where('id',$id)->update([...Arr::except($data,'rate'),'rate'=>$data['rate'],'calculated_amount'=>(float)$calculator->commission($data['base_amount'],$data['rate']),'updated_at'=>now()]); return; }
         abort(404);
+    }
+
+    private function orderUsesStock(string $status): bool
+    {
+        return in_array($status,['confirmee','acompte_recu','achat_lance','achat_effectue'],true);
+    }
+
+    private function syncOrderStock(iterable $oldItems, bool $oldApplied, array $newItems, bool $newApplied, int $userId, string $orderNumber): void
+    {
+        $quantities=function(iterable $items, bool $applied): array {
+            if(!$applied) return [];
+            $totals=[];
+            foreach($items as $item) {
+                $productId=(int)data_get($item,'inventory_product_id');
+                if(!$productId) continue;
+                $totals[$productId]=($totals[$productId]??0)+(float)data_get($item,'quantity',0);
+            }
+            return $totals;
+        };
+
+        $before=$quantities($oldItems,$oldApplied);
+        $after=$quantities($newItems,$newApplied);
+        $productIds=array_unique([...array_keys($before),...array_keys($after)]);
+        sort($productIds);
+
+        foreach($productIds as $productId) {
+            $delta=($after[$productId]??0)-($before[$productId]??0);
+            if(abs($delta)<0.000001) continue;
+            $product=DB::table('inventory_products')->whereNull('deleted_at')->lockForUpdate()->find($productId);
+            if(!$product) throw ValidationException::withMessages(['items'=>'Un produit de stock sélectionné n’est plus disponible.']);
+            if($delta>0&&(float)$product->available_quantity<$delta) {
+                $index=collect($newItems)->search(fn($item)=>(int)($item['inventory_product_id']??0)===$productId);
+                throw ValidationException::withMessages(["items.$index.quantity"=>"Stock insuffisant pour {$product->name}. Disponible : {$product->available_quantity}."]);
+            }
+
+            $quantity=(float)$product->quantity-$delta;
+            $available=max(0,$quantity-(float)$product->reserved_quantity);
+            DB::table('inventory_products')->where('id',$productId)->update([
+                'quantity'=>$quantity,
+                'available_quantity'=>$available,
+                'total_purchase_cost'=>$quantity*(float)$product->purchase_price+(float)$product->freight,
+                'sale_total'=>$quantity*(float)$product->sale_price,
+                'stock_value'=>$quantity*(float)$product->purchase_price,
+                'exited_at'=>$delta>0?today():$product->exited_at,
+                'updated_at'=>now(),
+            ]);
+            DB::table('stock_movements')->insert([
+                'inventory_product_id'=>$productId,
+                'type'=>$delta>0?'sortie':'entree',
+                'quantity'=>abs($delta),
+                'before_quantity'=>$product->quantity,
+                'after_quantity'=>$quantity,
+                'notes'=>($delta>0?'Commande confirmée ':'Restauration commande ').$orderNumber,
+                'moved_at'=>now(),
+                'user_id'=>$userId,
+            ]);
+        }
     }
 
     private function reversePaymentEffects(object $payment): void
@@ -617,7 +677,7 @@ class ModuleController extends Controller
             'commandes'=>[$select('quote_id','Créer à partir du devis n°',$quotes,false),$select('client_id','Client',$clients),$select('commission_enabled','Appliquer une commission',[['value'=>0,'label'=>'Non'],['value'=>1,'label'=>'Oui']],true,0),$input('commission_rate','Taux commission (%)','number',false,8),$input('deposit','Acompte reçu (Ar)','number',false,0),$input('ordered_at','Date de commande','date',true,$today),$select('shipping_mode','Mode d’envoi',$o(['aerien','maritime']),false),$select('status','Statut',[['value'=>'brouillon','label'=>'Brouillon'],['value'=>'demande_recue','label'=>'Demande reçue'],['value'=>'attente_validation','label'=>'Attente validation'],['value'=>'confirmee','label'=>'Confirmée'],['value'=>'acompte_recu','label'=>'Acompte reçu'],['value'=>'achat_lance','label'=>'Achat lancé'],['value'=>'achat_effectue','label'=>'Achat effectué']],true,'brouillon'),$input('notes','Notes internes','textarea',false)],
             'paiements'=>[$select('client_id','Client',$clients),$select('order_id','Commande à créditer (optionnelle)',$orders,false),$select('invoice_id','Facture à créditer (optionnelle)',$invoices,false),$input('paid_at','Date','date',true,$today),$input('amount','Montant reçu (Ar)','number'),$input('allocated_amount','Montant affecté (Ar)','number',false,0),$select('method','Mode de paiement',$o(['Mobile Money','Virement bancaire','Espèces','Chèque'])),$input('reference','Référence','text',false),$select('type','Motif du paiement',[['value'=>'acompte_commande','label'=>'Acompte de commande'],['value'=>'solde_commande','label'=>'Solde de commande'],['value'=>'fournisseur_chine','label'=>'Paiement fournisseur en Chine'],['value'=>'fret_transport','label'=>'Frais de fret / transport'],['value'=>'frais_service','label'=>'Frais de service'],['value'=>'autre','label'=>'Autre']]),$input('payment_object','Objet du paiement','text'),$input('notes','Précision / notes (obligatoire si Autre)','textarea',false)],
             'factures'=>[$select('order_id','Commande',$orders),$select('type','Type de facture',$o(['produits','frais'])),$input('issued_at','Date','date',true,$today),$input('subtotal','Total (Ar)','number'),$input('paid_amount','Montant déjà reçu (Ar)','number',false,0),$select('status','Statut',$o(['brouillon','provisoire','finale','payee','partielle']),true,'brouillon')],
-            'achats'=>[$select('supplier_id','Fournisseur',$suppliers),$select('order_id','Commande concernée',$orders),$input('paid_at','Date','date',true,$today),$input('amount','Montant payé (Ar)','number'),$select('method','Mode',$o(['WeChat','Alipay','banque'])),$input('reference','Référence','text',false),$input('proof','Justificatif — capture (optionnelle)','file',false),$input('proof_url','Justificatif — lien (optionnel)','url',false),$select('status','Statut du paiement',$o(['paye','partiel','en_attente'])),$input('notes','Notes de suivi','textarea',false)],
+            'achats'=>[$select('supplier_id','Fournisseur',$suppliers),$select('order_id','Commande concernée',$orders),$input('paid_at','Date','date',true,$today),$input('quantity','Quantité','number'),$input('unit_price','Prix unitaire (Ar)','number'),$input('amount','Montant total payé (Ar)','number')+['readOnly'=>true,'money'=>true],$select('method','Mode',$o(['WeChat','Alipay','banque'])),$input('reference','Référence','text',false),$input('proof','Justificatif — capture (optionnelle)','file',false),$input('proof_url','Justificatif — lien (optionnel)','url',false),$select('status','Statut du paiement',$o(['paye','partiel','en_attente'])),$input('notes','Notes de suivi','textarea',false)],
             'logistique'=>[
                 $select('order_id','Numéro de commande',$orders)+['section'=>'1. Liaison'],
                 $select('status','Statut',[
@@ -632,8 +692,8 @@ class ModuleController extends Controller
                 $input('tracking','Tracking number','text',false)+['section'=>'3. Suivi'],
                 $input('forwarder','Transitaire','text',false)+['section'=>'3. Suivi'],
                 $input('container_reference','Référence conteneur','text',false)+['section'=>'3. Suivi'],
-                $input('china_departure_at','Date de départ (Chine)','date',false)+['section'=>'4. Dates','startRow'=>true],
-                $input('china_warehouse_at','Date d’arrivée en Chine (dépôt)','date',false)+['section'=>'4. Dates'],
+                $input('china_warehouse_at','Date d’arrivée en Chine (dépôt)','date',false)+['section'=>'4. Dates','startRow'=>true],
+                $input('china_departure_at','Date de départ (Chine)','date',false)+['section'=>'4. Dates'],
                 $input('expected_madagascar_at','Arrivage prévu (Madagascar)','date',false)+['section'=>'4. Dates'],
                 $input('arrived_madagascar_at','Arrivage réel (Madagascar)','date',false)+['section'=>'4. Dates'],
                 $input('cbm','CBM / volume','number',false)+['section'=>'5. Volume'],
@@ -654,10 +714,24 @@ class ModuleController extends Controller
     {
         if(!in_array($module,['devis','commandes'],true)) return [];
         $suppliers=DB::table('suppliers')->where('active',true)->orderBy('name')->get()->map(fn($x)=>['value'=>$x->id,'label'=>$x->name,'contact'=>$x->contact])->all();
-        $base=[['name'=>'name','label'=>'Nom du produit / article','type'=>'text','required'=>true]];
+        $base=[];
+        if($module==='commandes') {
+            $stock=DB::table('inventory_products')->whereNull('deleted_at')->orderBy('name')->get()->map(fn($product)=>[
+                'value'=>$product->id,
+                'label'=>$product->name.' — stock disponible : '.(float)$product->available_quantity,
+                'name'=>$product->name,
+                'specifications'=>$product->short_description??null,
+                'purchase_price'=>(float)$product->purchase_price,
+                'sale_price'=>(float)$product->sale_price,
+                'available_quantity'=>(float)$product->available_quantity,
+                'photo_url'=>$product->photo_path?'/product-photo/'.basename($product->photo_path):null,
+            ])->all();
+            $base[]=['name'=>'inventory_product_id','label'=>'Produit existant dans le stock (optionnel)','type'=>'select','required'=>false,'options'=>$stock];
+        }
+        $base[]=['name'=>'name','label'=>'Nom du produit / article','type'=>'text','required'=>true];
         $base[]=['name'=>'photo','label'=>$module==='devis'?'Photo du produit sur le devis':'Photo réelle du produit','type'=>'file','required'=>false];
         $base=[...$base,['name'=>'specifications','label'=>'Spécifications','type'=>'textarea','required'=>false],['name'=>'quantity','label'=>'Quantité','type'=>'number','required'=>true],['name'=>'supplier_id','label'=>'Sélectionner un fournisseur','type'=>'select','required'=>false,'options'=>$suppliers],['name'=>'supplier_name','label'=>'Nom du fournisseur (saisie manuelle)','type'=>'text','required'=>false],['name'=>'supplier_contact','label'=>'Contact fournisseur','type'=>'text','required'=>false],['name'=>'source_url','label'=>'Lien 1688 / Taobao','type'=>'url','required'=>false],['name'=>'supplier_price','label'=>'Prix fournisseur unitaire (Ar)','type'=>'number','required'=>true],['name'=>'china_delivery','label'=>'Livraison locale Chine (Ar)','type'=>'number','required'=>false],['name'=>'packaging','label'=>'Emballage (Ar)','type'=>'number','required'=>false],['name'=>'weight','label'=>'Poids estimé (kg)','type'=>'number','required'=>false],['name'=>'cbm','label'=>'CBM estimé','type'=>'number','required'=>false],['name'=>'freight','label'=>'Fret (Ar)','type'=>'number','required'=>false],['name'=>'margin','label'=>'Marge (Ar)','type'=>'number','required'=>false],['name'=>'commission','label'=>'Commission (Ar)','type'=>'number','required'=>false]];
-        return [...$base,['name'=>$module==='devis'?'total':'client_total','label'=>$module==='devis'?'Prix de vente / Total de la ligne (Ar)':'Prix final client de la ligne (Ar)','type'=>'number','required'=>true]];
+        return [...$base,['name'=>$module==='devis'?'total':'client_total','label'=>'Prix total (Ar)','type'=>'number','required'=>true,'readOnly'=>$module==='commandes']];
     }
 
     private function emptyItem(string $module): array
@@ -668,7 +742,7 @@ class ModuleController extends Controller
     private function existingItems(string $module, int $id): array
     {
         if($module==='devis') return DB::table('quote_items')->where('quote_id',$id)->orderBy('id')->get()->map(fn($item)=>['id'=>$item->id,'name'=>$item->name,'photo'=>null,'photo_url'=>$item->photo_path?'/product-photo/'.basename($item->photo_path):null,'specifications'=>$item->specifications,'quantity'=>$item->quantity,'supplier_id'=>$item->supplier_id,'supplier_name'=>$item->supplier_name,'supplier_contact'=>$item->supplier_contact,'source_url'=>$item->source_url,'supplier_price'=>$item->supplier_price,'china_delivery'=>$item->china_delivery,'packaging'=>$item->packaging,'weight'=>$item->estimated_weight,'cbm'=>$item->estimated_cbm,'freight'=>$item->estimated_freight,'margin'=>$item->margin,'commission'=>$item->commission,'total'=>$item->total])->all();
-        if($module==='commandes') return DB::table('order_items')->where('order_id',$id)->orderBy('id')->get()->map(fn($item)=>['id'=>$item->id,'name'=>$item->name,'photo'=>null,'photo_url'=>$item->photo_path?'/product-photo/'.basename($item->photo_path):null,'specifications'=>$item->specifications,'quantity'=>$item->quantity,'supplier_id'=>$item->supplier_id,'supplier_name'=>$item->supplier_name,'supplier_contact'=>$item->supplier_contact,'source_url'=>$item->source_url,'supplier_price'=>$item->supplier_price,'china_delivery'=>$item->china_delivery,'packaging'=>$item->packaging,'weight'=>$item->weight,'cbm'=>$item->cbm,'freight'=>$item->freight,'margin'=>$item->margin,'commission'=>$item->commission,'client_total'=>$item->client_total])->all();
+        if($module==='commandes') return DB::table('order_items')->where('order_id',$id)->orderBy('id')->get()->map(fn($item)=>['id'=>$item->id,'inventory_product_id'=>$item->inventory_product_id,'name'=>$item->name,'photo'=>null,'photo_url'=>$item->photo_path?'/product-photo/'.basename($item->photo_path):null,'specifications'=>$item->specifications,'quantity'=>$item->quantity,'supplier_id'=>$item->supplier_id,'supplier_name'=>$item->supplier_name,'supplier_contact'=>$item->supplier_contact,'source_url'=>$item->source_url,'supplier_price'=>$item->supplier_price,'china_delivery'=>$item->china_delivery,'packaging'=>$item->packaging,'weight'=>$item->weight,'cbm'=>$item->cbm,'freight'=>$item->freight,'margin'=>$item->margin,'commission'=>$item->commission,'client_total'=>$item->client_total])->all();
         return [];
     }
 
@@ -738,7 +812,10 @@ class ModuleController extends Controller
         if($module!=='commandes') return [];
         return DB::table('quotes')->whereNull('deleted_at')->orderByDesc('id')->get()->map(function($quote){
             $client=DB::table('clients')->find($quote->client_id);
-            $items=DB::table('quote_items')->where('quote_id',$quote->id)->orderBy('id')->get()->map(fn($item)=>['quote_item_id'=>$item->id,'name'=>$item->name,'photo'=>null,'photo_url'=>$item->photo_path?'/product-photo/'.basename($item->photo_path):null,'specifications'=>$item->specifications,'quantity'=>$item->quantity,'supplier_id'=>$item->supplier_id,'supplier_name'=>$item->supplier_name,'supplier_contact'=>$item->supplier_contact,'source_url'=>$item->source_url,'supplier_price'=>$item->supplier_price,'china_delivery'=>$item->china_delivery,'packaging'=>$item->packaging,'weight'=>$item->estimated_weight,'cbm'=>$item->estimated_cbm,'freight'=>$item->estimated_freight,'margin'=>$item->margin,'commission'=>$item->commission,'client_total'=>$item->total])->all();
+            $items=DB::table('quote_items')->where('quote_id',$quote->id)->orderBy('id')->get()->map(function($item){
+                $unitPrice=(float)$item->supplier_price+(float)$item->china_delivery+(float)$item->packaging+(float)$item->estimated_freight+(float)$item->margin;
+                return ['quote_item_id'=>$item->id,'name'=>$item->name,'photo'=>null,'photo_url'=>$item->photo_path?'/product-photo/'.basename($item->photo_path):null,'specifications'=>$item->specifications,'quantity'=>$item->quantity,'supplier_id'=>$item->supplier_id,'supplier_name'=>$item->supplier_name,'supplier_contact'=>$item->supplier_contact,'source_url'=>$item->source_url,'supplier_price'=>$item->supplier_price,'china_delivery'=>$item->china_delivery,'packaging'=>$item->packaging,'weight'=>$item->estimated_weight,'cbm'=>$item->estimated_cbm,'freight'=>$item->estimated_freight,'margin'=>$item->margin,'commission'=>$item->commission,'client_total'=>$unitPrice*(float)$item->quantity];
+            })->all();
             return ['id'=>$quote->id,'number'=>$quote->number,'client_id'=>$quote->client_id,'client_name'=>$quote->client_name?:$client?->name,'client_contact'=>$quote->contact?:$client?->contact,'shipping_mode'=>$quote->shipping_mode,'items'=>$items];
         })->keyBy('id')->all();
     }

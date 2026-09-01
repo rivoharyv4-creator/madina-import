@@ -28,6 +28,8 @@ return [
         'invoices',
         'quotes',
         'receipts',
+        'deliveries',
+        'delivery-notes',
         'logistics',
         'exports',
     ],

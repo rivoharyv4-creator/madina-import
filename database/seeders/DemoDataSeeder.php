@@ -114,7 +114,7 @@ class DemoDataSeeder extends Seeder
                 ]);
 
                 DB::table('supplier_payments')->updateOrInsert(['reference' => "ACH-DEMO-$suffix"], [
-                    'supplier_id' => $supplier->id, 'paid_at' => $date, 'amount' => $unitCost * $quantity, 'method' => ['WeChat', 'Alipay', 'banque'][($i - 1) % 3],
+                    'supplier_id' => $supplier->id, 'paid_at' => $date, 'quantity' => $quantity, 'unit_price' => $unitCost, 'amount' => $unitCost * $quantity, 'method' => ['WeChat', 'Alipay', 'banque'][($i - 1) % 3],
                     'proof_path' => null, 'proof_url' => null, 'status' => 'paye', 'notes' => 'Achat de démonstration', 'created_at' => $now, 'updated_at' => $now,
                 ]);
                 $supplierPaymentId = DB::table('supplier_payments')->where('reference', "ACH-DEMO-$suffix")->value('id');

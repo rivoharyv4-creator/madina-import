@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PersistentStorageService
@@ -48,6 +49,23 @@ class PersistentStorageService
         return $this->storeFile($file,'logistics');
     }
 
+    public function storeDeliveryProof(?UploadedFile $file): ?string
+    {
+        return $this->storeFile($file,'deliveries');
+    }
+
+    public function storeSignatureData(?string $data): ?string
+    {
+        if(!$data) return null;
+        abort_unless(preg_match('/^data:image\/(png|jpeg);base64,(.+)$/s',$data,$matches)===1,422);
+        $contents=base64_decode($matches[2],true);
+        abort_unless($contents!==false&&strlen($contents)<=2*1024*1024,422);
+        $this->ensureDirectories();
+        $path='deliveries/signature-'.Str::uuid().'.'.($matches[1]==='jpeg'?'jpg':'png');
+        Storage::disk('persistent')->put($path,$contents);
+        return $path;
+    }
+
     public function putExport(string $filename, string $contents): string
     {
         $this->ensureDirectories();
@@ -58,7 +76,7 @@ class PersistentStorageService
 
     public function putDocumentPdf(string $directory, string $filename, string $contents): string
     {
-        abort_unless(in_array($directory,['quotes','invoices','receipts'],true),404);
+        abort_unless(in_array($directory,['quotes','invoices','receipts','delivery-notes'],true),404);
         $this->ensureDirectories();
         $path=$directory.'/'.basename($filename);
         Storage::disk('persistent')->put($path,$contents);

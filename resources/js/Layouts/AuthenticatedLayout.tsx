@@ -1,11 +1,29 @@
 import { Link, usePage } from '@inertiajs/react';
 import BrandLogo from '@/Components/BrandLogo';
 import { PropsWithChildren, ReactNode, useEffect, useState } from 'react';
-import { Bell, BookOpen, Boxes, ChartNoAxesCombined, CheckCircle2, ChevronDown, ClipboardList, Factory, FileText, Gauge, Landmark, LogOut, Menu, PackageCheck, ReceiptText, Scale, Search, Settings, Ship, ShoppingCart, Store, UserCog, UserRound, Users, WalletCards, X, BadgeDollarSign } from 'lucide-react';
+import { Bell, BookOpen, Boxes, ChartNoAxesCombined, CheckCircle2, ChevronDown, ClipboardList, Factory, FileText, Gauge, Landmark, LogOut, Menu, PackageCheck, ReceiptText, Scale, Search, Settings, Ship, ShoppingCart, Truck, UserCog, UserRound, Users, WalletCards, X, BadgeDollarSign } from 'lucide-react';
 
 const nav = [
  ['Demandes publiques','/modules/demandes',ClipboardList],
- ['Dashboard','/dashboard',Gauge],['Clients','/modules/clients',Users],['Demandes de devis','/modules/demandes-devis',ClipboardList],['Devis','/modules/devis',FileText],['Commandes','/modules/commandes',PackageCheck],['Paiements clients','/modules/paiements',WalletCards],['Factures','/modules/factures',ReceiptText],['Fournisseurs','/modules/fournisseurs',Factory],['Achats fournisseurs','/modules/achats',ShoppingCart],['Logistique','/modules/logistique',Ship],['Stock','/modules/stock',Boxes],['Catalogue','/modules/catalogue',BookOpen],['Ventes locales','/modules/ventes',Store],['Dépenses','/modules/depenses',Landmark],['Employés','/modules/employes',UserRound],['Salaires et IRSA','/modules/salaires',BadgeDollarSign],['Fiscalité','/modules/fiscalite',Scale],['Rapports','/modules/rapports',ChartNoAxesCombined],['Paramètres','/modules/parametres',Settings],
+ ['Dashboard','/dashboard',Gauge],
+ ['Clients','/modules/clients',Users],
+ ['Demandes de devis','/modules/demandes-devis',ClipboardList],
+ ['Devis','/modules/devis',FileText],
+ ['Commandes','/modules/commandes',PackageCheck],
+ ['Bons de livraison','/modules/bons-livraison',Truck],
+ ['Paiements clients','/modules/paiements',WalletCards],
+ ['Factures','/modules/factures',ReceiptText],
+ ['Fournisseurs','/modules/fournisseurs',Factory],
+ ['Achats fournisseurs','/modules/achats',ShoppingCart],
+ ['Logistique','/modules/logistique',Ship],
+ ['Stock','/modules/stock',Boxes],
+ ['Catalogue','/modules/catalogue',BookOpen],
+ ['Dépenses','/modules/depenses',Landmark],
+ ['Employés','/modules/employes',UserRound],
+ ['Salaires et IRSA','/modules/salaires',BadgeDollarSign],
+ ['Fiscalité','/modules/fiscalite',Scale],
+ ['Rapports','/modules/rapports',ChartNoAxesCombined],
+ ['Paramètres','/modules/parametres',Settings],
 ] as const;
 
 export default function Authenticated({ header, children, action }: PropsWithChildren<{header?:ReactNode; action?:ReactNode}>) {
