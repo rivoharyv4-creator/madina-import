@@ -4,6 +4,10 @@ import { Download, ExternalLink, Eye, FileDown, FilePlus2, Inbox, Pencil, Plus, 
 import { FormEvent, useEffect, useState } from 'react';
 
 const moneyKeys=['total','amount','price','value','salary','balance','budget'];
+const quoteRequestLabels:Record<string,string>={
+ nouveau:'🆕 Nouveau',a_contacter:'📞 À contacter',a_qualifier:'🔎 À qualifier',qualifie:'✅ Qualifié',devis_envoye:'💰 Devis envoyé',en_negociation:'🔄 En négociation',commande_confirmee:'🟢 Commande confirmée',perdu:'🔴 Perdu',en_attente:'⏸️ En attente',
+ urgent:'🔴 Urgent',prioritaire:'🟠 Prioritaire',normal:'🟡 Normal',faible:'🟢 Faible',
+};
 const display=(key:string,value:any)=>{
  if(value===null||value===undefined||value==='') return '—';
  if(key==='order_id'&&String(value).includes('::')) {const [id,label]=String(value).split('::',2);return <Link href={`/modules/commandes/${id}`} className="font-semibold text-[#BD2433] hover:underline">{label}</Link>;}
@@ -11,6 +15,7 @@ const display=(key:string,value:any)=>{
  if(key==='is_published') return value?'Publié':'Non publié';
  if(key==='is_featured') return value?'Oui':'Non';
  if(key==='show_price') return value?'Afficher':'Masquer';
+ if(['status','sourcing_priority'].includes(key)&&quoteRequestLabels[String(value)]) return quoteRequestLabels[String(value)];
  if(moneyKeys.some(item=>key.includes(item))) return new Intl.NumberFormat('de-DE',{maximumFractionDigits:0}).format(Number(value))+' Ar';
  if(key.endsWith('_at')) return new Date(value).toLocaleDateString('fr-FR');
  if(key.endsWith('_date')||key==='month'||key==='valid_until') return new Date(`${value}T00:00:00`).toLocaleDateString('fr-FR');

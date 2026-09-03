@@ -28,7 +28,7 @@ class ModuleController extends Controller
     private function config(string $module): array
     {
         return [
-            'demandes-devis'=>['title'=>'Demandes de devis','table'=>'quote_requests','primary'=>'Nouvelle demande','editable'=>true,'columns'=>['request_date'=>'Date','client_name'=>'Client','client_contact'=>'Contact','source'=>'Source','quantity'=>'Quantité','budget'=>'Budget indicatif','shipping_mode'=>'Livraison','status'=>'Statut','assigned_to'=>'Assigné à','quote_id'=>'Devis lié']],
+            'demandes-devis'=>['title'=>'Demandes de devis','table'=>'quote_requests','primary'=>'Nouvelle demande','editable'=>true,'columns'=>['request_date'=>'Date','client_name'=>'Client','client_contact'=>'Contact','destination'=>'Destination','status'=>'Statut du prospect','sourcing_priority'=>'Priorité sourcing','assigned_to'=>'Assigné à','quote_id'=>'Devis lié']],
             'clients'=>['title'=>'Clients','table'=>'clients','primary'=>'Nouveau client','editable'=>true,'columns'=>['number'=>'N° client','name'=>'Client','contact'=>'Contact','type'=>'Type','credit_balance'=>'Solde client','active'=>'Statut']],
             'devis'=>['title'=>'Devis','table'=>'quotes','primary'=>'Nouveau devis','editable'=>true,'columns'=>['number'=>'N° devis','created_at'=>'Date du devis','client_id'=>'Client','total'=>'Montant','valid_until'=>'Validité','status'=>'Statut']],
             'commandes'=>['title'=>'Commandes','table'=>'orders','primary'=>'Nouvelle commande','editable'=>true,'columns'=>['number'=>'N° commande','client_id'=>'Client','client_total'=>'Total client','ordered_at'=>'Date','status'=>'Statut']],
@@ -62,7 +62,7 @@ class ModuleController extends Controller
             if($module==='devis') $rows=array_map(fn($row)=>[...$row,'created_at'=>$this->chinaDate($row['created_at'])],$rows);
             $pagination=['current_page'=>$page->currentPage(),'last_page'=>$page->lastPage(),'per_page'=>$page->perPage(),'total'=>$page->total(),'from'=>$page->firstItem(),'to'=>$page->lastItem()];
             foreach($filterDefinitions as $field=>$label){
-                $values=DB::table($config['table'])->whereNotNull($field)->distinct()->orderBy($field)->pluck($field)->map(fn($value)=>['value'=>(string)$value,'label'=>$field==='active'?((bool)$value?'Actif':'Inactif'):ucfirst(str_replace('_',' ',(string)$value))])->values()->all();
+                $values=DB::table($config['table'])->whereNotNull($field)->distinct()->orderBy($field)->pluck($field)->map(fn($value)=>['value'=>(string)$value,'label'=>$this->filterValueLabel($module,$field,$value)])->values()->all();
                 $filterOptions[]=['field'=>$field,'label'=>$label,'options'=>$values];
             }
         }
@@ -644,7 +644,7 @@ class ModuleController extends Controller
         $originOrders=DB::table('orders')->whereNull('deleted_at')->orderByDesc('id')->get()->map(function($order){$containers=DB::table('shipments')->where('order_id',$order->id)->whereNotNull('container_reference')->pluck('container_reference')->filter()->unique()->implode(', ');return ['value'=>$order->id,'label'=>$order->number.($containers?' · Conteneur '.$containers:'')];})->all();
         $o=fn(array $values)=>array_map(fn($v)=>['value'=>$v,'label'=>ucfirst(str_replace('_',' ',$v))],$values); $today=today()->toDateString();
         return match($module){
-            'demandes-devis'=>[$input('client_name','Nom du client'),$input('client_contact','Téléphone / WhatsApp / e-mail'),$select('source','Source de la demande',[['value'=>'facebook','label'=>'Facebook'],['value'=>'bouche_a_oreille','label'=>'Bouche-à-oreille'],['value'=>'autre','label'=>'Autre']]),$input('description','Description du produit ou service demandé','textarea'),$input('quantity','Quantité souhaitée','number',true,1),$input('budget','Budget indicatif (Ar)','number',false),$input('desired_deadline','Délai souhaité','text',false),$select('shipping_mode','Mode de livraison souhaité',[['value'=>'maritime','label'=>'Maritime'],['value'=>'aerien','label'=>'Aérien'],['value'=>'non_precise','label'=>'Non précisé']],true,'non_precise'),$select('status','Statut',[['value'=>'nouvelle_demande','label'=>'Nouvelle demande'],['value'=>'en_cours_analyse','label'=>'En cours d’analyse'],['value'=>'devis_envoye','label'=>'Devis envoyé'],['value'=>'sans_suite','label'=>'Sans suite']],true,'nouvelle_demande'),$input('request_date','Date de la demande','date',true,$today),$select('assigned_to','Assigné à',$users,false),$input('internal_note','Note interne','textarea',false)],
+            'demandes-devis'=>[$input('client_name','Nom du client'),$input('client_contact','Téléphone / WhatsApp / e-mail'),$select('source','Source de la demande',[['value'=>'facebook','label'=>'Facebook'],['value'=>'bouche_a_oreille','label'=>'Bouche-à-oreille'],['value'=>'autre','label'=>'Autre']]),$input('destination','Destination','text',false),$input('description','Description du produit ou service demandé','textarea'),$input('quantity','Quantité souhaitée','number',true,1),$input('budget','Budget indicatif (Ar)','number',false),$input('desired_deadline','Délai souhaité','text',false),$select('shipping_mode','Mode de livraison souhaité',[['value'=>'maritime','label'=>'Maritime'],['value'=>'aerien','label'=>'Aérien'],['value'=>'non_precise','label'=>'Non précisé']],true,'non_precise'),$select('status','Statut du prospect',[['value'=>'nouveau','label'=>'🆕 Nouveau'],['value'=>'a_contacter','label'=>'📞 À contacter'],['value'=>'a_qualifier','label'=>'🔎 À qualifier'],['value'=>'qualifie','label'=>'✅ Qualifié'],['value'=>'devis_envoye','label'=>'💰 Devis envoyé'],['value'=>'en_negociation','label'=>'🔄 En négociation'],['value'=>'commande_confirmee','label'=>'🟢 Commande confirmée'],['value'=>'perdu','label'=>'🔴 Perdu'],['value'=>'en_attente','label'=>'⏸️ En attente']],true,'nouveau'),$select('sourcing_priority','Priorité sourcing',[['value'=>'urgent','label'=>'🔴 Urgent'],['value'=>'prioritaire','label'=>'🟠 Prioritaire'],['value'=>'normal','label'=>'🟡 Normal'],['value'=>'faible','label'=>'🟢 Faible']],true,'normal'),$input('request_date','Date de la demande','date',true,$today),$select('assigned_to','Assigné à',$users,false),$input('internal_note','Note interne','textarea',false)],
             'clients'=>[$input('name','Nom ou raison sociale'),$input('contact','WhatsApp / téléphone'),$select('type','Type de client',$o(['revendeur','entrepreneur','particulier','hotel'])),$input('address','Adresse','text',false),$input('notes','Notes','textarea',false),$select('active','Statut',[['value'=>1,'label'=>'Actif'],['value'=>0,'label'=>'Inactif']],true,1)],
             'fournisseurs'=>[$input('name','Nom du fournisseur'),$input('category','Catégorie','text',false),$input('moq','MOQ','number',false),$input('production_days','Délai de production (jours)','number',false),$input('contact','Contact','text',false),$select('quality_rating','Qualité',$o(['1','2','3','4','5']),true,3),$input('notes','Notes','textarea',false)],
             'stock'=>[
@@ -918,7 +918,7 @@ class ModuleController extends Controller
     {
         return match($module){
             'clients'=>['active'=>'Statut'],
-            'demandes-devis'=>['status'=>'Statut'],
+            'demandes-devis'=>['status'=>'Statut du prospect','sourcing_priority'=>'Priorité sourcing'],
             'devis'=>['status'=>'Statut'],
             'commandes'=>['status'=>'Statut'],
             'paiements'=>['type'=>'Type','status'=>'Statut'],
@@ -937,6 +937,29 @@ class ModuleController extends Controller
             'rapports'=>['event'=>'Opération'],
             default=>[],
         };
+    }
+
+    private function filterValueLabel(string $module, string $field, mixed $value): string
+    {
+        if($field==='active') return (bool)$value?'Actif':'Inactif';
+        if($module==='demandes-devis'&&$field==='status') return [
+            'nouveau'=>'🆕 Nouveau',
+            'a_contacter'=>'📞 À contacter',
+            'a_qualifier'=>'🔎 À qualifier',
+            'qualifie'=>'✅ Qualifié',
+            'devis_envoye'=>'💰 Devis envoyé',
+            'en_negociation'=>'🔄 En négociation',
+            'commande_confirmee'=>'🟢 Commande confirmée',
+            'perdu'=>'🔴 Perdu',
+            'en_attente'=>'⏸️ En attente',
+        ][$value]??ucfirst(str_replace('_',' ',(string)$value));
+        if($module==='demandes-devis'&&$field==='sourcing_priority') return [
+            'urgent'=>'🔴 Urgent',
+            'prioritaire'=>'🟠 Prioritaire',
+            'normal'=>'🟡 Normal',
+            'faible'=>'🟢 Faible',
+        ][$value]??ucfirst(str_replace('_',' ',(string)$value));
+        return ucfirst(str_replace('_',' ',(string)$value));
     }
 
     private function uniqueProductSlug(string $value, ?int $ignoreId=null): string

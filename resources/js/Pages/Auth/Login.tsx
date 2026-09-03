@@ -38,7 +38,7 @@ export default function Login({
                 </div>
             )}
 
-            {errors.email&&<div role="alert" aria-live="polite" className="mb-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-red-800"><span className="grid size-9 shrink-0 place-items-center rounded-lg bg-white text-[#BD2433] shadow-sm"><ShieldAlert size={18}/></span><div><strong className="block text-sm">Connexion impossible</strong><p className="mt-0.5 text-xs leading-relaxed text-red-700">{errors.email}</p><p className="mt-1.5 text-[10px] text-red-500">Pour votre sécurité, nous ne précisons pas quelle information est incorrecte.</p></div></div>}
+            {errors.email&&<div role="alert" aria-live="polite" className="mb-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-red-800"><span className="grid size-9 shrink-0 place-items-center rounded-lg bg-white text-[#BD2433] shadow-sm"><ShieldAlert size={18}/></span><div><strong className="block text-sm">Connexion impossible</strong><p className="mt-0.5 text-xs leading-relaxed text-red-700">{errors.email}</p></div></div>}
 
             <form onSubmit={submit}>
                 <div>
