@@ -20,6 +20,19 @@ La base SQLite incluse contient des exemples de clients, fournisseurs, produits,
 
 ## Production
 
+For MariaDB hosting, configure the production environment with credentials supplied by the host:
+
+```env
+DB_CONNECTION=mariadb
+DB_HOST=your-mariadb-host
+DB_PORT=3306
+DB_DATABASE=your-database-name
+DB_USERNAME=your-database-user
+DB_PASSWORD=your-database-password
+```
+
+After setting or changing these variables, run `php artisan config:clear` (or rebuild the production configuration cache), followed by `php artisan migrate --force`. Do not run `migrate:fresh` on production.
+
 La base incluse est destinée aux tests client. Avant une mise en production, repartir d’une base vide, remplacer le mot de passe de démonstration, configurer HTTPS, `APP_ENV=production`, `APP_DEBUG=false`, les sauvegardes SQLite et le stockage privé des pièces jointes.
 
 ### Laravel Cloud et conservation des données

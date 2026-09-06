@@ -56,9 +56,12 @@ class PublicSiteController extends Controller
 
     public function lookupTracking(Request $request): Response
     {
+        $mode=$request->string('mode')->toString()==='name'?'name':'number';
+        if($mode==='name') return $this->lookupTrackingByName($request);
+
         $orderNumber=Str::upper(trim($request->string('order_number')->toString()));
         $trackingNumber=trim($request->string('tracking_number')->toString());
-        if($orderNumber===''||$trackingNumber===''||mb_strlen($orderNumber)>50||mb_strlen($trackingNumber)>255) return $this->invalidTrackingLookup($request,$orderNumber);
+        if($orderNumber===''||$trackingNumber===''||mb_strlen($orderNumber)>50||mb_strlen($trackingNumber)>255) return $this->invalidTrackingLookup($request,$orderNumber,'number');
 
         $order=DB::table('orders')
             ->join('shipments','shipments.order_id','=','orders.id')
@@ -68,15 +71,33 @@ class PublicSiteController extends Controller
             ->select('orders.*')
             ->first();
         if(!$order){
-            return $this->invalidTrackingLookup($request,$orderNumber);
+            return $this->invalidTrackingLookup($request,$orderNumber,'number');
         }
         return Inertia::render('Public/Tracking',['tracking'=>$this->trackingPayload($order,$trackingNumber),'publicConfig'=>$this->publicConfig()]);
     }
 
-    private function invalidTrackingLookup(Request $request, string $orderNumber): Response
+    private function lookupTrackingByName(Request $request): Response
     {
-        Log::warning('Public tracking lookup failed',['ip_hash'=>hash_hmac('sha256',(string)$request->ip(),(string)config('app.key')),'order_hash'=>hash('sha256',$orderNumber)]);
-        return Inertia::render('Public/Tracking',['tracking'=>null,'lookupError'=>'Tracking number invalide ou suivi pas encore trouvé.','publicConfig'=>$this->publicConfig()]);
+        $name=trim($request->string('recipient_name')->toString());
+        $phone=preg_replace('/\D+/', '', $request->string('phone')->toString())??'';
+        if($name===''||$phone===''||mb_strlen($name)>255||strlen($phone)>20) return $this->invalidTrackingLookup($request,$name,'name');
+
+        $client=DB::table('clients')
+            ->whereNull('deleted_at')
+            ->whereRaw('LOWER(name) = ?',[Str::lower($name)])
+            ->get(['id','contact'])
+            ->first(fn($candidate)=>(preg_replace('/\D+/', '', (string)$candidate->contact)??'')===$phone);
+        $order=$client ? DB::table('orders')->whereNull('deleted_at')->where('client_id',$client->id)->latest('ordered_at')->latest('id')->first() : null;
+        if(!$order) return $this->invalidTrackingLookup($request,$name,'name');
+
+        return Inertia::render('Public/Tracking',['tracking'=>$this->trackingPayload($order),'publicConfig'=>$this->publicConfig()]);
+    }
+
+    private function invalidTrackingLookup(Request $request, string $identifier, string $mode): Response
+    {
+        Log::warning('Public tracking lookup failed',['ip_hash'=>hash_hmac('sha256',(string)$request->ip(),(string)config('app.key')),'lookup_mode'=>$mode,'identifier_hash'=>hash('sha256',Str::lower($identifier))]);
+        $message=$mode==='name'?'Nom ou numéro de téléphone invalide, ou suivi pas encore trouvé.':'Tracking number invalide ou suivi pas encore trouvé.';
+        return Inertia::render('Public/Tracking',['tracking'=>null,'lookupError'=>$message,'publicConfig'=>$this->publicConfig()]);
     }
 
     public function trackingLink(string $token): Response

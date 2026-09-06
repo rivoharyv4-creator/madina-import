@@ -90,6 +90,20 @@ class PublicSiteTest extends TestCase
         $this->get('/suivi/securise/'.$order->public_tracking_code)->assertNotFound();
     }
 
+    public function test_tracking_can_be_searched_by_exact_recipient_name_and_phone(): void
+    {
+        $client=DB::table('clients')->where('number','CLI-2026-001')->first();
+        $order=DB::table('orders')->where('client_id',$client->id)->latest('ordered_at')->first();
+
+        $this->post('/suivi',['mode'=>'name','recipient_name'=>$client->name,'phone'=>$client->contact])->assertOk()->assertInertia(fn(Assert $page)=>$page
+            ->component('Public/Tracking')->where('tracking.number',$order->number)
+            ->missing('tracking.client_id')->missing('tracking.client_name')->missing('tracking.phone')
+        );
+        $this->post('/suivi',['mode'=>'name','recipient_name'=>$client->name,'phone'=>'+261 00 00 000 00'])->assertOk()->assertInertia(fn(Assert $page)=>$page
+            ->component('Public/Tracking')->where('tracking',null)->where('lookupError','Nom ou numéro de téléphone invalide, ou suivi pas encore trouvé.')
+        );
+    }
+
     public function test_manager_can_publish_stock_with_catalog_fields(): void
     {
         $manager=User::where('email','manager@madina-import.mg')->firstOrFail();

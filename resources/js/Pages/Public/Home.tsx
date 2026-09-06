@@ -56,7 +56,7 @@ export default function Home({ products, publicConfig }: { products: CatalogProd
                         <div className="public-container flex min-h-[430px] items-center py-14">
                             <div className="public-reveal max-w-[640px]">
                                 <p className="public-kicker !text-[#FFE600]">Sourcing · Achat · Fret · Suivi</p>
-                                <h1 className="mt-5 max-w-[590px] text-[36px] font-bold leading-[1.08] tracking-[-.035em] text-white sm:text-[43px] lg:text-[48px]">
+                                <h1 className="mt-5 max-w-[590px] text-[34px] font-bold leading-[1.1] tracking-[-.035em] text-white sm:text-[40px] lg:text-[44px]">
                                     De la Chine à Madagascar, <span className="text-[#FFE600]">votre projet avance</span> en confiance.
                                 </h1>
                                 <p className="mt-5 max-w-[540px] text-sm leading-6 text-white/75">
@@ -182,7 +182,7 @@ export default function Home({ products, publicConfig }: { products: CatalogProd
                 <div className="public-container grid items-center gap-8 lg:grid-cols-[1fr_auto]">
                     <div>
                         <p className="public-kicker">Votre commande, sans zone d’ombre</p>
-                        <h2 className="mt-3 max-w-3xl text-3xl font-bold tracking-[-.025em] sm:text-[34px]">Consultez les étapes avec votre accès sécurisé.</h2>
+                        <h2 className="mt-3 max-w-3xl text-[28px] font-bold tracking-[-.025em] sm:text-[32px]">Consultez les étapes avec votre accès sécurisé.</h2>
                         <p className="mt-3 max-w-2xl text-sm text-[#5E5E5E]">Votre numéro de commande et votre Tracking number suffisent pour retrouver les informations utiles.</p>
                     </div>
                     <Link href="/suivi" className="public-button">Suivre ma commande <ArrowRight size={16} /></Link>
@@ -228,7 +228,7 @@ function Header({ kicker, title, text, centered = false }: { kicker: string; tit
     return (
         <div className={centered ? 'text-center' : ''}>
             <p className="public-kicker">{kicker}</p>
-            <h2 className={`mt-3 text-[28px] font-bold leading-[1.16] tracking-[-.025em] text-[#171717] sm:text-[36px] ${centered ? 'mx-auto' : ''}`}>{title}</h2>
+            <h2 className={`mt-3 text-[27px] font-bold leading-[1.18] tracking-[-.025em] text-[#171717] sm:text-[34px] ${centered ? 'mx-auto' : ''}`}>{title}</h2>
             {text && <p className={`mt-4 max-w-2xl text-sm leading-7 text-[#5E5E5E] ${centered ? 'mx-auto' : ''}`}>{text}</p>}
         </div>
     );

@@ -228,14 +228,14 @@ class ModuleController extends Controller
     public function update(StoreModuleRequest $request, string $module, int $id, BusinessCalculator $calculator)
     {
         $config=$this->config($module); abort_unless($config['editable']??false,404); $query=DB::table($config['table']); if(DB::getSchemaBuilder()->hasColumn($config['table'],'deleted_at')) $query->whereNull('deleted_at'); $old=$query->find($id); abort_unless($old,404); $data=$request->validated();
-        DB::transaction(function() use($request,$config,$module,$id,$old,$data,$calculator){ $this->applyUpdate($module,$id,$old,$data,$request->user()->id,$calculator); DB::table('audit_logs')->insert(['user_id'=>$request->user()->id,'event'=>$module.'.modifie','auditable_type'=>$config['table'],'auditable_id'=>$id,'old_values'=>json_encode($old),'new_values'=>json_encode($data),'ip_address'=>$request->ip(),'created_at'=>now()]); });
+        DB::transaction(function() use($request,$config,$module,$id,$old,$data,$calculator){ $this->applyUpdate($module,$id,$old,$data,$request->user()->id,$calculator); DB::table('audit_logs')->insert(['user_id'=>$request->user()->id,'event'=>$module.'.modifie','auditable_type'=>$config['table'],'auditable_id'=>$id,'old_values'=>$this->auditJson($old),'new_values'=>$this->auditJson($data),'ip_address'=>$request->ip(),'created_at'=>now()]); });
         return redirect()->route('modules.index',$module)->with('success',$config['title'].' : modifications enregistrées.');
     }
 
     public function destroyEmployee(Request $request, int $id)
     {
         $employee=DB::table('employees')->whereNull('deleted_at')->find($id); abort_unless($employee,404);
-        DB::transaction(function() use($request,$employee,$id){ $leftAt=$request->input('left_at',today()->toDateString()); $reason=$request->input('departure_reason')?:'Départ de l’entreprise'; DB::table('employees')->where('id',$id)->update(['active'=>false,'left_at'=>$leftAt,'departure_reason'=>$reason,'deleted_at'=>now(),'updated_at'=>now()]); DB::table('audit_logs')->insert(['user_id'=>$request->user()->id,'event'=>'employes.depart','auditable_type'=>'employees','auditable_id'=>$id,'old_values'=>json_encode($employee),'new_values'=>json_encode(['active'=>false,'left_at'=>$leftAt,'departure_reason'=>$reason]),'ip_address'=>$request->ip(),'created_at'=>now()]); });
+        DB::transaction(function() use($request,$employee,$id){ $leftAt=$request->input('left_at',today()->toDateString()); $reason=$request->input('departure_reason')?:'Départ de l’entreprise'; DB::table('employees')->where('id',$id)->update(['active'=>false,'left_at'=>$leftAt,'departure_reason'=>$reason,'deleted_at'=>now(),'updated_at'=>now()]); DB::table('audit_logs')->insert(['user_id'=>$request->user()->id,'event'=>'employes.depart','auditable_type'=>'employees','auditable_id'=>$id,'old_values'=>$this->auditJson($employee),'new_values'=>$this->auditJson(['active'=>false,'left_at'=>$leftAt,'departure_reason'=>$reason]),'ip_address'=>$request->ip(),'created_at'=>now()]); });
         return redirect()->route('modules.index','employes')->with('success','Employé retiré de l’entreprise. Son historique salarial est conservé.');
     }
 
@@ -264,7 +264,7 @@ class ModuleController extends Controller
                 default=>abort(404),
             };
             if($module==='devis'&&!empty($data['quote_request_id'])) DB::table('quote_requests')->where('id',$data['quote_request_id'])->update(['quote_id'=>$id,'status'=>'devis_envoye','updated_at'=>$now]);
-            DB::table('audit_logs')->insert(['user_id'=>$request->user()->id,'event'=>$module.'.cree','auditable_type'=>$this->config($module)['table'],'auditable_id'=>$id,'old_values'=>null,'new_values'=>json_encode($data),'ip_address'=>$request->ip(),'created_at'=>$now]);
+            DB::table('audit_logs')->insert(['user_id'=>$request->user()->id,'event'=>$module.'.cree','auditable_type'=>$this->config($module)['table'],'auditable_id'=>$id,'old_values'=>null,'new_values'=>$this->auditJson($data),'ip_address'=>$request->ip(),'created_at'=>$now]);
             return $id;
         });
         return redirect()->route('modules.index',$module)->with('success',$this->config($module)['title'].' : enregistrement créé avec succès.');
@@ -967,6 +967,25 @@ class ModuleController extends Controller
         $base=Str::slug($value)?:'produit'; $slug=$base; $suffix=2;
         while(DB::table('inventory_products')->where('slug',$slug)->when($ignoreId,fn($query)=>$query->where('id','!=',$ignoreId))->exists()) $slug=$base.'-'.$suffix++;
         return $slug;
+    }
+
+    private function auditJson(mixed $value): ?string
+    {
+        if($value===null) return null;
+
+        $normalize=function(mixed $item) use (&$normalize): mixed {
+            if($item instanceof UploadedFile) return [
+                'name'=>$item->getClientOriginalName(),
+                'mime_type'=>$item->getClientMimeType(),
+                'size'=>(int)$item->getSize(),
+            ];
+            if(is_array($item)) return array_map($normalize,$item);
+            if(is_object($item)) return array_map($normalize,get_object_vars($item));
+            if(is_resource($item)) return '[resource]';
+            return $item;
+        };
+
+        return json_encode($normalize($value),JSON_THROW_ON_ERROR|JSON_INVALID_UTF8_SUBSTITUTE);
     }
 
     private function storeGallery(array $files): array

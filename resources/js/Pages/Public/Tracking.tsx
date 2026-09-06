@@ -1,7 +1,7 @@
 import PublicLayout, { PublicConfig } from '@/Layouts/PublicLayout';
-import { Head, useForm } from '@inertiajs/react';
-import { Check, ChevronRight, ClipboardCheck, Clock3, Handshake, Hash, MapPinCheck, Navigation, PackageCheck, PackageSearch, Search, ShieldCheck, ShoppingCart, Truck, Warehouse } from 'lucide-react';
-import { FormEvent, useState } from 'react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Box, Hash, MapPinCheck, Navigation, PackageSearch, Phone, Radio, RefreshCw, Search, ShieldCheck, UserRound } from 'lucide-react';
+import { FormEvent, type ReactNode, useState } from 'react';
 
 type Tracking = {
     number: string;
@@ -15,16 +15,31 @@ type Tracking = {
 };
 
 const date = (value?: string) => value ? new Date(value).toLocaleDateString('fr-FR') : '—';
-const trackingStepIcons=[ClipboardCheck,ShoppingCart,Warehouse,PackageCheck,Navigation,MapPinCheck,Handshake];
+const resultSteps=['Entrepôt','Préparée','Transit','Arrivée','Remise'];
 
 export default function TrackingPage({ tracking, lookupError, publicConfig }: { tracking: Tracking | null; lookupError?: string; publicConfig: PublicConfig }) {
-    const { data, setData, post, processing, errors } = useForm({ order_number: '', tracking_number: '' });
+    const { data, setData, post, processing, errors, clearErrors } = useForm({ mode: 'number', order_number: '', tracking_number: '', recipient_name: '', phone: '' });
+    const [lookupMode, setLookupMode] = useState<'number' | 'name'>('number');
     const [selectedShipmentIndex, setSelectedShipmentIndex] = useState<number | null>(null);
     const matchedIndex = tracking?.matched_tracking ? tracking.shipments.findIndex(shipment => String(shipment.tracking).toLowerCase() === String(tracking.matched_tracking).toLowerCase()) : -1;
     const activeIndex = selectedShipmentIndex===null ? Math.max(0,matchedIndex) : Math.min(selectedShipmentIndex,Math.max(0,(tracking?.shipments.length||1)-1));
     const activeShipment = tracking?.shipments[activeIndex] || tracking?.shipments[0];
+    const activeStage = shipmentStage(activeShipment);
+    const routeProgress = [.08,.28,.58,.82,1][activeStage];
     const submit = (e: FormEvent) => {
         e.preventDefault();
+        post('/suivi', { preserveScroll: true });
+    };
+    const changeLookupMode = (mode: 'number' | 'name') => {
+        setLookupMode(mode);
+        setData('mode', mode);
+        clearErrors();
+    };
+    const refreshResult = () => {
+        if(window.location.pathname.startsWith('/suivi/securise/')) {
+            router.reload();
+            return;
+        }
         post('/suivi', { preserveScroll: true });
     };
 
@@ -34,84 +49,131 @@ export default function TrackingPage({ tracking, lookupError, publicConfig }: { 
                 <meta name="description" content="Accédez au suivi sécurisé de votre commande Madina Import." />
             </Head>
 
-            <section className="tracking-hero border-b border-black/10 bg-white px-4 py-16 text-[#171717] sm:py-24">
-                <div className="tracking-card mx-auto max-w-[760px] rounded-[28px] border border-black/[.07] bg-[#F7F7F7] px-5 py-10 shadow-[0_22px_70px_rgba(23,23,23,.10)] sm:px-14 sm:py-14">
-                    <div className="mx-auto max-w-xl text-center">
-                        <span className="mx-auto grid size-12 place-items-center rounded-full bg-[#C8102E]/10 text-[#C8102E]">
-                            <ShieldCheck size={23} />
-                        </span>
-                        <h1 className="mt-5 text-4xl font-black tracking-[-.045em] sm:text-5xl">Suivi de colis</h1>
-                        <p className="mt-3 text-sm leading-6 text-black/55">Saisissez les informations transmises par votre interlocuteur Madina Import pour consulter votre commande.</p>
-                    </div>
-
-                    <div className="mx-auto mt-8 flex w-fit items-center gap-2 rounded-full border border-[#C8102E]/25 bg-white px-4 py-2 text-xs font-bold text-[#C8102E]">
-                        <Hash size={15} /> Numéro de commande + Tracking number
-                    </div>
-
-                    <form onSubmit={submit} className="mx-auto mt-8 grid max-w-[500px] gap-5">
-                        <label>
-                            <span className="mb-2 block text-xs font-bold">Numéro de commande</span>
-                            <span className="relative block">
-                                <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-black/35" size={19} />
-                                <input value={data.order_number} onChange={e => setData('order_number', e.target.value)} className="public-field !rounded-xl !py-4 !pl-12" placeholder="Exemple : MI-2026-001" required />
+            {!tracking && <section className="tracking-hero flex flex-1 items-center justify-center px-4 py-14 text-[#171717] sm:py-20">
+                <div className="tracking-card mx-auto max-w-[440px] overflow-hidden rounded-[10px] border px-6 py-9 sm:px-9 sm:py-10">
+                    <div className="tracking-card-water" aria-hidden="true" />
+                    <div className="tracking-card-content">
+                        <div className="mx-auto max-w-sm text-center">
+                            <span className="tracking-shield mx-auto grid size-[52px] place-items-center rounded-full text-[#C8102E]">
+                                <ShieldCheck size={24} />
                             </span>
-                            {errors.order_number && <small className="mt-1 block text-[#C8102E]">{errors.order_number}</small>}
-                        </label>
-                        <label>
-                            <span className="mb-2 block text-xs font-bold">Tracking number</span>
-                            <span className="relative block">
-                                <PackageSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-black/35" size={18} />
-                                <input value={data.tracking_number} onChange={e => setData('tracking_number', e.target.value)} className="public-field !rounded-xl !py-4 !pl-12 font-mono" placeholder="Saisissez votre Tracking number" autoComplete="off" required />
-                            </span>
-                            {errors.tracking_number && <small className="mt-1 block text-[#C8102E]">{errors.tracking_number}</small>}
-                        </label>
-                        {lookupError && <p className="rounded-xl bg-[#C8102E]/8 px-4 py-3 text-sm font-semibold text-[#C8102E]">{lookupError}</p>}
-                        <button disabled={processing} className="public-button mt-1 !w-full !justify-center !rounded-full !py-4">
-                            <Search size={17} /> {processing ? 'Vérification…' : 'Rechercher mon colis'}
-                        </button>
-                    </form>
-                </div>
-            </section>
-
-            {tracking && (
-                <section className="tracking-result-zone overflow-hidden py-14 sm:py-20">
-                    <div className="public-container tracking-result-enter">
-                        <div className="flex flex-wrap items-end justify-between gap-4">
-                            <div><p className="text-2xl font-black tracking-[-.03em]">{tracking.shipments.length} résultat{tracking.shipments.length > 1 ? 's' : ''} trouvé{tracking.shipments.length > 1 ? 's' : ''}</p><p className="tracking-result-muted mt-1 text-xs">Sélectionnez une expédition pour consulter son détail.</p></div>
-                            <span className="tracking-order-chip rounded-full border px-4 py-2 text-xs">Commande <strong className="ml-1">{tracking.number}</strong></span>
+                            <h1 className="mt-5 text-[25px] font-extrabold tracking-[-.04em]">Suivi de colis</h1>
+                            <p className="tracking-card-subtitle mx-auto mt-2 max-w-[340px] text-[13px] leading-5">Recherchez votre expédition par numéro de commande ou par nom du destinataire.</p>
                         </div>
 
-                        {!!tracking.shipments.length && <div className="mt-7 grid gap-3">
-                            {tracking.shipments.map((shipment,index)=>{const meta=statusMeta(shipment.status);return <button type="button" key={`${shipment.tracking}-${index}`} onClick={()=>setSelectedShipmentIndex(index)} style={{animationDelay:`${index*90}ms`}} className={`tracking-result-row tracking-shipment-row group flex w-full items-center justify-between gap-5 rounded-2xl border px-5 py-4 text-left transition duration-300 hover:-translate-y-0.5 ${activeIndex===index?'selected':''}`}>
-                                <span><strong className="block font-mono text-sm">#{shipment.tracking||`EXP-${index+1}`}</strong><small className="tracking-result-muted mt-1 block">{shipment.container_reference||`Expédition ${index+1}`}</small></span><StatusBadge label={meta.label} tone={meta.tone}/>
-                            </button>})}
-                        </div>}
+                        <div className={`tracking-segment mt-7 grid grid-cols-2 gap-1 rounded-lg border p-1 ${lookupMode === 'name' ? 'mode-name' : ''}`} role="group" aria-label="Méthode de recherche">
+                            <span className="tracking-segment-slider" aria-hidden="true" />
+                            <button type="button" onClick={() => changeLookupMode('number')} className={`tracking-segment-button flex items-center justify-center gap-2 rounded-md px-2 py-2.5 text-xs font-bold ${lookupMode === 'number' ? 'active' : ''}`} aria-pressed={lookupMode === 'number'}>
+                                <Hash size={14} /> Par numéro
+                            </button>
+                            <button type="button" onClick={() => changeLookupMode('name')} className={`tracking-segment-button flex items-center justify-center gap-2 rounded-md px-2 py-2.5 text-xs font-bold ${lookupMode === 'name' ? 'active' : ''}`} aria-pressed={lookupMode === 'name'}>
+                                <UserRound size={14} /> Par nom
+                            </button>
+                        </div>
 
-                        {activeShipment && <div key={`${activeShipment.tracking}-${activeIndex}`} className="tracking-detail-enter tracking-detail-border mt-10 border-t pt-10">
-                            <div className="tracking-current-card rounded-[26px] border p-6 sm:p-8">
-                                <div className="flex flex-wrap items-start justify-between gap-5"><div><p className="tracking-result-muted text-xs font-bold uppercase tracking-[.18em]">Statut actuel</p><h2 className="mt-3 text-2xl font-black">{statusMeta(activeShipment.status).label}</h2><p className="tracking-result-muted mt-2 font-mono text-xs">Tracking number : #{activeShipment.tracking}</p></div><StatusBadge label={statusMeta(activeShipment.status).label} tone={statusMeta(activeShipment.status).tone}/></div>
-                                <p className="tracking-result-copy mt-6 max-w-2xl text-sm leading-7">{statusMessage(activeShipment.status)}</p>
-                                <p className="tracking-result-subtle mt-4 flex items-center gap-2 text-xs"><Clock3 size={14}/>Dernière mise à jour : {date(activeShipment.updated_at||tracking.updated_at)}</p>
+                        <form onSubmit={submit} className="mt-6 grid gap-4">
+                            <div key={lookupMode} className="tracking-form-panel grid gap-4">
+                                {lookupMode === 'number' ? <>
+                                    <label>
+                                        <span className="tracking-field-label mb-2 block text-xs font-bold">Numéro de commande</span>
+                                        <span className="tracking-input-wrap relative block rounded-lg border">
+                                            <Hash className="tracking-input-icon absolute left-4 top-1/2 -translate-y-1/2" size={16} />
+                                            <input value={data.order_number} onChange={e => setData('order_number', e.target.value)} className="tracking-input w-full rounded-lg border-0 bg-transparent py-3.5 pl-11 pr-4 text-[13px] focus:ring-0" placeholder="Exemple : MI-2026-001" required autoFocus />
+                                        </span>
+                                        {errors.order_number && <small className="mt-1 block text-[#C8102E]">{errors.order_number}</small>}
+                                    </label>
+                                    <label>
+                                        <span className="tracking-field-label mb-2 block text-xs font-bold">Tracking number</span>
+                                        <span className="tracking-input-wrap relative block rounded-lg border">
+                                            <PackageSearch className="tracking-input-icon absolute left-4 top-1/2 -translate-y-1/2" size={16} />
+                                            <input value={data.tracking_number} onChange={e => setData('tracking_number', e.target.value)} className="tracking-input w-full rounded-lg border-0 bg-transparent py-3.5 pl-11 pr-4 font-mono text-[13px] focus:ring-0" placeholder="Saisissez votre tracking number" autoComplete="off" required />
+                                        </span>
+                                        {errors.tracking_number && <small className="mt-1 block text-[#C8102E]">{errors.tracking_number}</small>}
+                                    </label>
+                                </> : <>
+                                    <label>
+                                        <span className="tracking-field-label mb-2 block text-xs font-bold">Nom complet</span>
+                                        <span className="tracking-input-wrap relative block rounded-lg border">
+                                            <UserRound className="tracking-input-icon absolute left-4 top-1/2 -translate-y-1/2" size={16} />
+                                            <input value={data.recipient_name} onChange={e => setData('recipient_name', e.target.value)} className="tracking-input w-full rounded-lg border-0 bg-transparent py-3.5 pl-11 pr-4 text-[13px] focus:ring-0" placeholder="Exemple : Rakoto Andrianina" autoComplete="name" required autoFocus />
+                                        </span>
+                                        {errors.recipient_name && <small className="mt-1 block text-[#C8102E]">{errors.recipient_name}</small>}
+                                    </label>
+                                    <label>
+                                        <span className="tracking-field-label mb-2 block text-xs font-bold">Numéro de téléphone</span>
+                                        <span className="tracking-input-wrap relative block rounded-lg border">
+                                            <Phone className="tracking-input-icon absolute left-4 top-1/2 -translate-y-1/2" size={16} />
+                                            <input type="tel" value={data.phone} onChange={e => setData('phone', e.target.value)} className="tracking-input w-full rounded-lg border-0 bg-transparent py-3.5 pl-11 pr-4 text-[13px] focus:ring-0" placeholder="+261 34 00 000 00" autoComplete="tel" required />
+                                        </span>
+                                        {errors.phone && <small className="mt-1 block text-[#C8102E]">{errors.phone}</small>}
+                                    </label>
+                                </>}
                             </div>
-
-                            <div className="tracking-result-panel mt-7 rounded-[26px] border p-6 sm:p-8">
-                                <div className="flex items-center justify-between"><h3 className="text-lg font-black">Suivi</h3><span className="tracking-result-subtle text-[10px] font-bold uppercase tracking-[.17em]">Progression en direct</span></div>
-                                <ol className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-7">
-                                    {tracking.steps.map((step,index)=>{const StepIcon=trackingStepIcons[index]||PackageCheck;return <li key={step.label} style={{animationDelay:`${index*75}ms`}} className={`tracking-journey-card tracking-step-${step.state} relative flex min-h-[148px] flex-col rounded-2xl border p-3.5 ${step.state}`}>
-                                        {index<tracking.steps.length-1&&<span className="tracking-journey-arrow absolute -right-[14px] top-1/2 z-10 hidden size-5 -translate-y-1/2 items-center justify-center rounded-full lg:flex"><ChevronRight size={12} strokeWidth={2.4}/></span>}
-                                        <div className="flex items-center justify-between"><span className="tracking-step-number text-[9px] font-black uppercase tracking-[.16em]">Étape {String(index+1).padStart(2,'0')}</span>{step.state==='complete'&&<span className="tracking-complete-mark grid size-5 place-items-center rounded-full"><Check size={11} strokeWidth={3}/></span>}</div>
-                                        <span className="tracking-journey-icon mt-4 grid size-10 place-items-center rounded-xl"><StepIcon size={19} strokeWidth={1.8}/></span>
-                                        <strong className="mt-3 text-[11px] leading-4">{step.label}</strong>
-                                        <small className="tracking-step-state mt-auto pt-2 text-[8px] font-black uppercase tracking-[.14em]">{step.state==='complete'?'Terminé':step.state==='current'?'En cours':'À venir'}</small>
-                                    </li>})}
-                                </ol>
-                            </div>
-
-                            <div className="mt-7">
-                                <div className="tracking-result-panel rounded-[26px] border p-6 sm:p-7"><div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-xl bg-sky-500/10 text-sky-500"><Truck size={17}/></span><h3 className="font-black">Transport</h3></div><dl className="tracking-result-divide mt-5 divide-y"><DarkInfo label="Identifiant" value={activeShipment.container_reference||activeShipment.tracking}/><DarkInfo label="Transitaire" value={activeShipment.forwarder||'À confirmer'}/><DarkInfo label="Mode" value={activeShipment.mode||tracking.shipping_mode||'À confirmer'}/><DarkInfo label="Départ de Chine" value={date(activeShipment.china_departure_at)}/><DarkInfo label="Arrivée prévue" value={date(activeShipment.expected_madagascar_at)}/><DarkInfo label="Volume" value={activeShipment.cbm?`${activeShipment.cbm} CBM`:'—'}/><DarkInfo label="Colis / cartons" value={`${activeShipment.package_count||0} / ${activeShipment.carton_count||0}`}/></dl></div>
-                            </div>
-                        </div>}
+                            {lookupError && <p className="tracking-lookup-error rounded-lg border px-4 py-3 text-sm font-semibold text-[#C8102E]">{lookupError}</p>}
+                            <button disabled={processing} className="tracking-submit mt-0.5 flex w-full items-center justify-center gap-2 rounded-lg bg-[#C8102E] px-5 py-3.5 text-sm font-extrabold text-white transition hover:bg-[#a90d27] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#C8102E]/25 disabled:opacity-60">
+                                <Search size={17} /> {processing ? 'Vérification…' : 'Rechercher'}
+                            </button>
+                        </form>
                     </div>
+                </div>
+            </section>}
+
+            {tracking && (
+                <section className="tracking-result-showcase flex flex-1 items-center justify-center overflow-hidden px-4 py-14 sm:py-20">
+                    {activeShipment ? <article key={`${activeShipment.tracking}-${activeIndex}`} className="tracking-result-card tracking-result-card-enter w-full max-w-[460px] overflow-hidden rounded-[10px] border px-6 py-8 sm:px-8">
+                        <div className="tracking-result-content relative z-10">
+                            <p className="tracking-result-kicker text-[10px] font-extrabold uppercase tracking-[.2em]">Madina Import · Fret {activeShipment.mode==='aerien'?'aérien':'maritime'}</p>
+                            <h1 className="mt-4 flex items-center gap-2 text-[25px] font-extrabold tracking-[-.035em]">
+                                {resultHeadline(activeShipment.status)}
+                                <span className="tracking-live-dot grid size-4 shrink-0 place-items-center rounded-full" aria-label="Statut actif"><span className="size-1.5 rounded-full" /></span>
+                            </h1>
+                            <p className="tracking-result-reference mt-1 text-[12px]">Tracking #{activeShipment.tracking||`EXP-${activeIndex+1}`} · {activeShipment.forwarder||activeShipment.container_reference||'Madina Cargo'}</p>
+
+                            {tracking.shipments.length>1&&<div className="tracking-result-switcher mt-4 flex flex-wrap gap-1.5" aria-label="Choisir une expédition">
+                                {tracking.shipments.map((shipment,index)=><button key={`${shipment.tracking}-${index}`} type="button" onClick={()=>setSelectedShipmentIndex(index)} className={activeIndex===index?'active':''}>{index+1}</button>)}
+                            </div>}
+
+                            <div className="mt-8">
+                                <svg className="tracking-route w-full overflow-visible" viewBox="0 0 392 82" role="img" aria-label="Trajet de Chine vers Madagascar">
+                                    <path d="M12 60 Q196 -2 380 60" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="4 6" className="tracking-route-pending" />
+                                    <path d="M12 60 Q196 -2 380 60" fill="none" stroke="currentColor" strokeWidth="3" pathLength="100" className="tracking-route-complete">
+                                        <animate attributeName="stroke-dasharray" from="0 100" to={`${routeProgress*100} 100`} dur="1.6s" fill="freeze" calcMode="spline" keySplines="0.16 1 0.3 1" />
+                                    </path>
+                                    <circle cx="12" cy="60" r="4" className="tracking-route-start" />
+                                    <circle cx="380" cy="60" r="4" className="tracking-route-end" />
+                                    <g className="tracking-route-vehicle">
+                                        <path d="M-9 0h18L6 6H-5z" fill="currentColor" />
+                                        <path d="M-4 0v-6h7l3 6M-1-6v-4h3v4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+                                        <animateMotion dur="1.6s" fill="freeze" path="M12 60 Q196 -2 380 60" keyPoints={`0;${routeProgress}`} keyTimes="0;1" calcMode="spline" keySplines="0.16 1 0.3 1" />
+                                    </g>
+                                </svg>
+                                <div className="tracking-route-labels -mt-1 flex justify-between text-[10px]">
+                                    <span>Chine</span>
+                                    <span>Madagascar</span>
+                                </div>
+                            </div>
+
+                            <dl className="mt-3 grid grid-cols-2 gap-2">
+                                <ResultFact icon={<Navigation size={13} />} label="Départ" value={date(activeShipment.china_departure_at)} />
+                                <ResultFact icon={<MapPinCheck size={13} />} label="Arrivée prévue" value={date(activeShipment.expected_madagascar_at)} />
+                                <ResultFact icon={<Box size={13} />} label="Volume" value={activeShipment.cbm?`${activeShipment.cbm} CBM`:'—'} />
+                                <ResultFact icon={<Radio size={13} />} label="Statut" value={statusMeta(activeShipment.status).label} accent />
+                            </dl>
+
+                            <ol className="mt-5 grid grid-cols-5 gap-1.5">
+                                {resultSteps.map((label,index)=><li key={label} style={{animationDelay:`${.7+index*.1}s`}} className={`tracking-result-step ${index<activeStage?'complete':index===activeStage?'current':'upcoming'} flex min-h-9 items-center justify-center rounded-md border px-1 text-center text-[9px] font-bold`}>{label}</li>)}
+                            </ol>
+
+                            <div className="tracking-result-actions mt-5 grid grid-cols-2 gap-2">
+                                <Link href="/suivi" className="tracking-result-action flex min-h-10 items-center justify-center gap-2 rounded-md border px-3 text-[11px] font-bold">
+                                    <Search size={14} /> Nouvelle recherche
+                                </Link>
+                                <button type="button" onClick={refreshResult} disabled={processing} className="tracking-result-action flex min-h-10 items-center justify-center gap-2 rounded-md border px-3 text-[11px] font-bold disabled:opacity-50">
+                                    <RefreshCw size={14} className={processing?'animate-spin':''} /> Actualiser
+                                </button>
+                            </div>
+                        </div>
+                    </article> : <div className="tracking-empty-result rounded-xl border px-6 py-8 text-center"><strong>Suivi en préparation</strong><p className="mt-2 text-sm">Aucune expédition n’est encore associée à cette commande.</p></div>}
                 </section>
             )}
         </PublicLayout>
@@ -124,15 +186,19 @@ function statusMeta(status?:string):{label:string;tone:'green'|'blue'|'amber'} {
     return {label:labels[value]||value.replaceAll('_',' '),tone:['arrive_madagascar','remis_client'].includes(value)?'green':value==='en_transit'||value==='expedie'?'blue':'amber'};
 }
 
-function statusMessage(status?:string):string {
-    return {commande_lancee:'Votre commande est confirmée et sa préparation logistique commence.',en_attente:'Votre colis est en préparation avant sa prise en charge.',arrive_en_chine:'Votre colis a été reçu et contrôlé dans notre dépôt en Chine.',expedie:'Votre colis a quitté notre dépôt et son acheminement a commencé.',en_transit:'Votre colis est actuellement en route vers Madagascar.',arrive_madagascar:'Votre colis est arrivé à Madagascar et passe les dernières étapes de traitement.',remis_client:'Votre colis est prêt. Préparez votre référence avant de vous déplacer.'}[String(status)]||'Le suivi de votre colis a été mis à jour.';
+function resultHeadline(status?:string):string {
+    return {commande_lancee:'Commande confirmée',en_attente:'Préparation de votre colis',arrive_en_chine:'Arrivé à l’entrepôt en Chine',expedie:'Expédié vers Madagascar',en_transit:'En transit vers Madagascar',arrive_madagascar:'Arrivé à Madagascar',remis_client:'Remis au client'}[String(status)]||statusMeta(status).label;
 }
 
-function StatusBadge({label,tone}:{label:string;tone:'green'|'blue'|'amber'}) {
-    const styles={green:'border-emerald-500/20 bg-emerald-500/10 text-emerald-400',blue:'border-sky-500/20 bg-sky-500/10 text-sky-400',amber:'border-amber-400/20 bg-amber-400/10 text-amber-300'};
-    return <span className={`tracking-status-badge tone-${tone} inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-bold ${styles[tone]}`}><span className="size-1.5 rounded-full bg-current shadow-[0_0_10px_currentColor]"/>{label}</span>;
+function shipmentStage(shipment?:any):number {
+    if(!shipment) return 0;
+    if(shipment.delivered_at||shipment.status==='remis_client') return 4;
+    if(shipment.arrived_madagascar_at||shipment.status==='arrive_madagascar') return 3;
+    if(shipment.china_departure_at||['expedie','en_transit'].includes(shipment.status)) return 2;
+    if(shipment.china_warehouse_at||shipment.supplier_sent_at||shipment.status==='arrive_en_chine') return 1;
+    return 0;
 }
 
-function DarkInfo({label,value}:{label:string;value:any}) {
-    return <div className="flex items-center justify-between gap-5 py-3.5 text-sm"><dt className="tracking-result-muted">{label}</dt><dd className="text-right font-bold capitalize">{value||'—'}</dd></div>;
+function ResultFact({icon,label,value,accent=false}:{icon:ReactNode;label:string;value:any;accent?:boolean}) {
+    return <div className="tracking-result-fact rounded-md border px-3.5 py-3"><dt className="flex items-center gap-2 text-[9px] font-medium uppercase tracking-wide"><span className="tracking-result-fact-icon grid size-6 place-items-center rounded-md">{icon}</span>{label}</dt><dd className={`mt-1.5 text-[13px] font-extrabold ${accent?'accent':''}`}>{value||'—'}</dd></div>;
 }

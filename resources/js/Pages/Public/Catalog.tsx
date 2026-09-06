@@ -29,7 +29,7 @@ export default function Catalog({ products, categories, filters, pagination, pub
             <section className="border-b border-black/10 bg-white py-20 text-[#171717]">
                 <div className="public-container">
                     <p className="public-kicker">Stock à Madagascar</p>
-                    <h1 className="mt-5 text-5xl font-black tracking-[-.045em] sm:text-6xl">Produits disponibles</h1>
+                    <h1 className="mt-5 text-4xl font-extrabold tracking-[-.04em] sm:text-[42px]">Produits disponibles</h1>
                     <p className="mt-5 max-w-2xl leading-8 text-[#5E5E5E]">Une sélection issue directement de notre stock. Pour un besoin spécifique, notre équipe peut également lancer une recherche en Chine.</p>
                 </div>
             </section>
@@ -55,7 +55,7 @@ export default function Catalog({ products, categories, filters, pagination, pub
                         </div>
                     ) : (
                         <div className="mt-10 border border-dashed border-black/20 bg-white px-6 py-20 text-center">
-                            <h2 className="text-2xl font-black">Aucun produit trouvé</h2>
+                            <h2 className="text-2xl font-extrabold">Aucun produit trouvé</h2>
                             <p className="mt-3 text-[#5E5E5E]">Essayez une autre recherche ou contactez-nous pour un sourcing personnalisé.</p>
                         </div>
                     )}

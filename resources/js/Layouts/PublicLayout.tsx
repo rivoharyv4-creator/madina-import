@@ -34,7 +34,7 @@ export default function PublicLayout({ children, config }: { children: React.Rea
     const toggleTheme = () => setTheme(current => current === 'light' ? 'dark' : 'light');
 
     return (
-        <div className={`public-site min-h-screen overflow-x-hidden bg-[#F8F7F3] text-[#171717] ${theme === 'dark' ? 'theme-dark' : 'theme-light'}`}>
+        <div className={`public-site flex min-h-screen flex-col overflow-x-hidden bg-[#F8F7F3] text-[#171717] ${theme === 'dark' ? 'theme-dark' : 'theme-light'}`}>
             <a href="#contenu" className="sr-only z-[100] rounded bg-white p-3 focus:not-sr-only focus:fixed focus:left-3 focus:top-3">
                 Aller au contenu
             </a>
@@ -95,7 +95,7 @@ export default function PublicLayout({ children, config }: { children: React.Rea
                 )}
             </header>
 
-            <main id="contenu" className="pt-[72px]">{children}</main>
+            <main id="contenu" className="flex flex-1 flex-col pt-[72px]">{children}</main>
 
             <footer className="border-t border-black/10 bg-white text-[#171717]">
                 <div className="public-container grid gap-10 py-12 md:grid-cols-[1.25fr_.75fr_1fr]">

@@ -251,6 +251,9 @@ class ModuleCreationTest extends TestCase
         Storage::fake('persistent');
         $photo=UploadedFile::fake()->image('article.webp',600,600);
         $this->actingAs($this->manager)->post('/modules/stock',['name'=>'Article photographié','photo'=>$photo,'quantity'=>4,'purchase_price'=>50000,'sale_price'=>85000,'alert_threshold'=>1])->assertRedirect('/modules/stock');
+        $auditJson=DB::table('audit_logs')->where('event','stock.cree')->latest('id')->value('new_values');
+        $audit=json_decode($auditJson,true,512,JSON_THROW_ON_ERROR);
+        $this->assertSame('article.webp',$audit['photo']['name']);
         $photoPath=DB::table('inventory_products')->where('name','Article photographié')->value('photo_path');
         $this->assertNotNull($photoPath); Storage::disk('persistent')->assertExists($photoPath);
         $stockId=DB::table('inventory_products')->where('name','Article photographié')->value('id');
