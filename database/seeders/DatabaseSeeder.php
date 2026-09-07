@@ -28,6 +28,12 @@ class DatabaseSeeder extends Seeder
             'active' => true,
         ]);
 
+        // Demo records are fixtures for the automated test suite only.
+        // Local, staging, and production seed runs must remain clean.
+        if (! app()->environment('testing')) {
+            return;
+        }
+
         DB::transaction(function () use ($manager): void {
             $now = now();
             $clients = [
