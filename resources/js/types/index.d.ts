@@ -14,4 +14,7 @@ export type PageProps<
     auth: {
         user: User;
     };
+    notifications: {
+        publicRequests: number;
+    };
 };

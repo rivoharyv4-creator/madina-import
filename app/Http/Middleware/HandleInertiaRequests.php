@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -32,7 +33,12 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'auth' => [
-                'user' => $request->user()?->only(['id','name','email','role','permissions','active']),
+                'user' => $request->user()?->only(['id', 'name', 'email', 'role', 'permissions', 'active']),
+            ],
+            'notifications' => fn () => [
+                'publicRequests' => $request->user()?->canAccessModule('demandes')
+                    ? DB::table('contact_requests')->where('status', 'nouvelle')->count()
+                    : 0,
             ],
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
