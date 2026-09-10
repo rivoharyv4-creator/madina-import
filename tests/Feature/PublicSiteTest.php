@@ -52,6 +52,11 @@ class PublicSiteTest extends TestCase
 
     public function test_contact_form_is_validated_and_saved_for_management(): void
     {
+        $this->get('/contact')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('Public/Contact')
+            ->where('publicConfig.address', 'Lot IIB 106, Ambatomainty - Manjakaray, Antananarivo')
+        );
+
         $payload = ['name' => 'Entreprise Test', 'contact' => '+261340000000', 'client_type' => 'entreprise', 'need' => 'Machine de production', 'message' => 'Nous souhaitons étudier une machine pour notre atelier.', 'consent' => true, 'website' => ''];
         $this->post('/contact', $payload)->assertRedirect()->assertSessionHas('success');
         $this->assertDatabaseHas('contact_requests', ['name' => 'Entreprise Test', 'status' => 'nouvelle']);

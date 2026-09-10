@@ -1,6 +1,6 @@
 import PublicLayout, { PublicConfig } from '@/Layouts/PublicLayout';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { Box, Hash, MapPinCheck, Navigation, PackageSearch, Phone, Radio, RefreshCw, Search, ShieldCheck, UserRound } from 'lucide-react';
+import { Box, Hash, MapPinCheck, Navigation, PackageSearch, Phone, Radio, RefreshCw, Search, UserRound } from 'lucide-react';
 import { FormEvent, type ReactNode, useState } from 'react';
 
 type Tracking = {
@@ -54,8 +54,8 @@ export default function TrackingPage({ tracking, lookupError, publicConfig }: { 
                     <div className="tracking-card-water" aria-hidden="true" />
                     <div className="tracking-card-content">
                         <div className="mx-auto max-w-sm text-center">
-                            <span className="tracking-shield mx-auto grid size-[52px] place-items-center rounded-full text-[#C8102E]">
-                                <ShieldCheck size={24} />
+                            <span className="tracking-shield mx-auto block size-[68px]" aria-hidden="true">
+                                <img src="/icons/madina-3d/tracking-secure.webp" width="512" height="512" alt="" />
                             </span>
                             <h1 className="mt-5 text-[25px] font-extrabold tracking-[-.04em]">Suivi de colis</h1>
                             <p className="tracking-card-subtitle mx-auto mt-2 max-w-[340px] text-[13px] leading-5">Recherchez votre expédition par numéro de commande ou par nom du destinataire.</p>

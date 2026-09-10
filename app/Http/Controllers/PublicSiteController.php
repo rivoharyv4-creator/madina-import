@@ -153,6 +153,6 @@ class PublicSiteController extends Controller
 
     private function publicConfig(): array
     {
-        return config('madina.public');
+        return [...config('madina.public'), 'address'=>config('madina.company.address')];
     }
 }

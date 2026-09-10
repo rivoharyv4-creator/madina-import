@@ -4,6 +4,7 @@ import { ArrowUpRight, Menu, Moon, Sun, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export type PublicConfig = {
+    address: string;
     madagascar_phone: string;
     china_phone: string;
     whatsapp: string;

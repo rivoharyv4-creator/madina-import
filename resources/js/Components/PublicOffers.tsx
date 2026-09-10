@@ -1,4 +1,4 @@
-import { ArrowRight, Check, Factory, SearchCheck, Ship, type LucideIcon } from 'lucide-react';
+import { ArrowRight, Check } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 
 type Offer = {
@@ -6,7 +6,7 @@ type Offer = {
     title: string;
     description: string;
     services: string[];
-    icon: LucideIcon;
+    icon: string;
     badge?: string;
     featured?: boolean;
     sectors?: string[];
@@ -24,7 +24,7 @@ const offers: Offer[] = [
             'Vérification de la qualité',
             'Vérification de la conformité',
         ],
-        icon: SearchCheck,
+        icon: '/icons/madina-3d/offer-sourcing.webp',
     },
     {
         number: '02',
@@ -38,7 +38,7 @@ const offers: Offer[] = [
             'Suivi de commande',
             'Accompagnement jusqu’à la livraison',
         ],
-        icon: Ship,
+        icon: '/icons/madina-3d/offer-turnkey.webp',
         badge: 'ACCOMPAGNEMENT COMPLET',
         featured: true,
     },
@@ -53,7 +53,7 @@ const offers: Offer[] = [
             'Recherche des fournisseurs',
             'Coordination complète de l’import',
         ],
-        icon: Factory,
+        icon: '/icons/madina-3d/offer-equipment.webp',
         sectors: ['Boulangerie', 'Restauration', 'Hôtellerie', 'Commerce', 'Petite industrie'],
     },
 ];
@@ -114,8 +114,6 @@ export default function PublicOffers() {
 }
 
 function OfferCard({ offer, index }: { offer: Offer; index: number }) {
-    const Icon = offer.icon;
-
     return (
         <article
             className={`offer-card ${offer.featured ? 'offer-card-featured' : ''}`}
@@ -126,7 +124,9 @@ function OfferCard({ offer, index }: { offer: Offer; index: number }) {
             <span className="offer-watermark" aria-hidden="true">{offer.number}</span>
             <div className="offer-card-content">
                 <div className="flex items-start justify-between gap-4">
-                    <span className="offer-icon" aria-hidden="true"><Icon size={25} strokeWidth={1.8} /></span>
+                    <span className="offer-icon" aria-hidden="true">
+                        <img src={offer.icon} width="512" height="512" alt="" />
+                    </span>
                     <span className="offer-number" aria-hidden="true">{offer.number}</span>
                 </div>
 

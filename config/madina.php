@@ -6,7 +6,7 @@ return [
         'email' => env('COMPANY_EMAIL','contactmadinaimport@gmail.com'),
         'contact' => env('COMPANY_CONTACT','+261 34 98 732 08'),
         'whatsapp' => env('COMPANY_WHATSAPP','+86 158 0200 3702'),
-        'address' => env('COMPANY_ADDRESS','Lot IIB 106 Ambatomainty Antananarivo'),
+        'address' => env('COMPANY_ADDRESS','Lot IIB 106, Ambatomainty - Manjakaray, Antananarivo'),
         'timezone' => env('COMPANY_TIMEZONE','Asia/Shanghai'),
         'nif' => env('COMPANY_NIF','4019196145'),
         'rcs' => env('COMPANY_RCS','2025B00524'),
