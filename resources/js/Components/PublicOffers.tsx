@@ -121,7 +121,6 @@ function OfferCard({ offer, index }: { offer: Offer; index: number }) {
             data-offers-reveal
             style={{ animationDelay: `${140 + index * 120}ms` }}
         >
-            <span className="offer-watermark" aria-hidden="true">{offer.number}</span>
             <div className="offer-card-content">
                 <div className="flex items-start justify-between gap-4">
                     <span className="offer-icon" aria-hidden="true">

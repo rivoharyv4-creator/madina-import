@@ -113,6 +113,9 @@
 .contact-map-address { color:#171717; }
 .contact-map-note { color:#5e5e5e; }
 .contact-map-frame { position:relative; background:#f3f5f4; }
+.contact-map-compact iframe { display:block; }
+.contact-map-route { box-shadow:0 8px 22px rgba(23,23,23,.18); transition:background-color .2s ease,transform .2s ease; }
+.contact-map-route:hover { background:#a90d27; transform:translateY(-1px); }
 .public-site.theme-dark .contact-map { border-color:rgba(255,255,255,.12) !important; background:#1a1d22 !important; }
 .public-site.theme-dark .contact-map-copy { background:#1a1d22; }
 .public-site.theme-dark .contact-map-icon { background:rgba(255,107,129,.14); color:#ff6b81; }
@@ -185,7 +188,6 @@
 .offer-icon { display:grid; width:58px; height:58px; flex:none; place-items:center; transition:transform 220ms ease; }
 .offer-icon img { width:100%; height:100%; object-fit:contain; filter:saturate(.92) contrast(1.02); transition:transform 220ms ease; }
 .offer-number { font-size:11px; font-weight:800; letter-spacing:.18em; color:var(--offers-muted); opacity:.62; }
-.offer-watermark { position:absolute; z-index:0; right:14px; top:44px; color:var(--offers-text); font-family:"Plus Jakarta Sans","Inter",sans-serif; font-size:96px; font-weight:800; line-height:1; letter-spacing:-.08em; opacity:.028; pointer-events:none; }
 .offer-heading { min-height:176px; }
 .offer-badge { display:inline-flex; margin-top:22px; border:1px solid rgba(200,16,46,.22); border-radius:999px; background:rgba(200,16,46,.075); padding:6px 9px; color:var(--offers-red); font-size:9px; font-weight:800; letter-spacing:.13em; line-height:1; }
 .offer-heading:not(:has(.offer-badge)) { padding-top:28px; }

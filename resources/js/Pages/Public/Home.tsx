@@ -1,4 +1,5 @@
 import PublicContactForm from '@/Components/PublicContactForm';
+import PublicLocationMap from '@/Components/PublicLocationMap';
 import PublicOffers from '@/Components/PublicOffers';
 import PublicWhyMadina from '@/Components/PublicWhyMadina';
 import PublicOrderProcess from '@/Components/PublicOrderProcess';
@@ -123,13 +124,16 @@ export default function Home({ products, publicConfig }: { products: CatalogProd
             </section>
 
             <section className="public-section border-t border-black/[.06] bg-[#F3F5F4]">
-                <div className="public-container grid gap-12 lg:grid-cols-[.75fr_1.25fr]">
-                    <div>
-                        <Header kicker="Parlons de votre projet" title="Une demande claire est le début d’un bon parcours." />
-                        <a href={whatsapp} target="_blank" rel="noreferrer" className="public-text-link mt-7">Nous contacter sur WhatsApp <ArrowRight size={16} /></a>
-                    </div>
-                    <div className="rounded-[4px] border border-black/[.07] bg-white p-6 shadow-[0_12px_40px_rgba(23,23,23,.05)] sm:p-8">
-                        <PublicContactForm flash={flash?.success} />
+                <div className="public-container">
+                    <div className="grid gap-12 lg:grid-cols-[minmax(0,.88fr)_minmax(0,1.12fr)] lg:gap-16">
+                        <div>
+                            <Header kicker="Parlons de votre projet" title="Une demande claire est le début d’un bon parcours." />
+                            <a href={whatsapp} target="_blank" rel="noreferrer" className="public-text-link mt-7">Nous contacter sur WhatsApp <ArrowRight size={16} /></a>
+                            <div className="mt-3"><PublicLocationMap address={publicConfig.address} compact /></div>
+                        </div>
+                        <div className="rounded-[4px] border border-black/[.07] bg-white p-6 shadow-[0_12px_40px_rgba(23,23,23,.05)] sm:p-8 lg:translate-x-3">
+                            <PublicContactForm flash={flash?.success} />
+                        </div>
                     </div>
                 </div>
             </section>

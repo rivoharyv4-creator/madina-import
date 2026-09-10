@@ -1,14 +1,12 @@
 import PublicContactForm from '@/Components/PublicContactForm';
+import PublicLocationMap from '@/Components/PublicLocationMap';
 import PublicLayout, { PublicConfig } from '@/Layouts/PublicLayout';
 import { Head, usePage } from '@inertiajs/react';
-import { ArrowUpRight, MapPin, MessageCircle, Navigation } from 'lucide-react';
+import { ArrowUpRight, MapPin, MessageCircle } from 'lucide-react';
 
 export default function Contact({ publicConfig }: { publicConfig: PublicConfig }) {
     const { flash } = usePage().props as any;
     const whatsapp = `https://wa.me/${publicConfig.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent('Bonjour Madina Import, je souhaite parler de mon projet.')}`;
-    const mapQuery = `Madina Import, ${publicConfig.address}, Madagascar`;
-    const mapEmbedUrl = `https://www.google.com/maps?q=${encodeURIComponent(mapQuery)}&output=embed`;
-    const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(mapQuery)}`;
 
     return (
         <PublicLayout config={publicConfig}>
@@ -48,35 +46,7 @@ export default function Contact({ publicConfig }: { publicConfig: PublicConfig }
                         </div>
                     </div>
 
-                    <div className="contact-map mt-14 overflow-hidden rounded-[18px] border border-black/10 bg-white">
-                        <div className="grid lg:grid-cols-[.72fr_1.28fr]">
-                            <div className="contact-map-copy p-6 sm:p-8 lg:p-10">
-                                <span className="contact-map-icon grid size-12 place-items-center rounded-2xl">
-                                    <MapPin size={23} aria-hidden="true" />
-                                </span>
-                                <p className="public-kicker mt-6">Nous trouver</p>
-                                <h2 className="mt-3 text-2xl font-extrabold tracking-tight">Madina Import à Ambatomainty</h2>
-                                <p className="contact-map-address mt-4 text-sm font-semibold leading-6">{publicConfig.address}</p>
-                                <p className="contact-map-note mt-4 text-sm leading-6">
-                                    Sur la route principale vers Ambatomainty, passez devant Jovena. Madina Import se trouve à droite, environ 50 m avant la zone de l’église EKAR Kristy Mpanjaka.
-                                </p>
-                                <a href={directionsUrl} target="_blank" rel="noreferrer" className="public-button mt-7">
-                                    <Navigation size={16} /> Ouvrir l’itinéraire
-                                </a>
-                            </div>
-
-                            <div className="contact-map-frame min-h-[360px] lg:min-h-[440px]">
-                                <iframe
-                                    src={mapEmbedUrl}
-                                    title="Localisation Google Maps de Madina Import à Ambatomainty"
-                                    className="h-full min-h-[360px] w-full border-0 lg:min-h-[440px]"
-                                    loading="lazy"
-                                    referrerPolicy="no-referrer-when-downgrade"
-                                    allowFullScreen
-                                />
-                            </div>
-                        </div>
-                    </div>
+                    <div className="mt-14"><PublicLocationMap address={publicConfig.address} /></div>
                 </div>
             </section>
         </PublicLayout>
