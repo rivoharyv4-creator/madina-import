@@ -1,6 +1,6 @@
 import BrandLogo from '@/Components/BrandLogo';
 import { Link } from '@inertiajs/react';
-import { ArrowUpRight, Facebook, Menu, Phone, X } from 'lucide-react';
+import { ArrowUpRight, Menu, Moon, Sun, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export type PublicConfig = {
@@ -12,7 +12,7 @@ export type PublicConfig = {
 
 const links = [
     ['Accueil', '/'],
-    ['Nos services', '/#services'],
+    ['Nos services', '/#offres'],
     ['Catalogue', '/catalogue'],
     ['Suivre une commande', '/suivi'],
     ['Contact', '/contact'],
@@ -66,7 +66,10 @@ export default function PublicLayout({ children, config }: { children: React.Rea
                         aria-pressed={theme === 'dark'}
                         title={theme === 'dark' ? 'Thème clair' : 'Thème sombre'}
                     >
-                        <span className="public-theme-toggle-thumb" aria-hidden="true"><span /></span>
+                        <span className="public-theme-toggle-thumb" aria-hidden="true">
+                            <Sun className="public-theme-toggle-sun" size={20} strokeWidth={2} />
+                            <Moon className="public-theme-toggle-moon" size={18} strokeWidth={1.8} />
+                        </span>
                     </button>
                     <a href={whatsapp} target="_blank" rel="noreferrer" className="public-button hidden lg:inline-flex">
                         Demander un devis <ArrowUpRight size={15} />
@@ -113,12 +116,14 @@ export default function PublicLayout({ children, config }: { children: React.Rea
                     </div>
                     <div>
                         <strong className="text-xs uppercase tracking-[.16em] text-[#C8102E]">Nous joindre</strong>
-                        <p className="mt-5 flex items-center gap-3 text-sm text-black/60"><Phone size={15} /> Madagascar : {config.madagascar_phone}</p>
-                        <p className="mt-3 flex items-center gap-3 text-sm text-black/60"><Phone size={15} /> Chine : {config.china_phone}</p>
-                        {config.facebook_url && <a href={config.facebook_url} target="_blank" rel="noreferrer" className="mt-3 flex items-center gap-3 text-sm text-black/60 transition hover:text-[#C8102E]"><Facebook size={15} /> Page Facebook</a>}
+                        <p className="mt-5 flex items-center gap-3 text-sm text-black/60"><img src="/icons/madina-3d/contact-phone.webp" width={256} height={256} alt="" aria-hidden="true" className="public-contact-icon" /> Madagascar : {config.madagascar_phone}</p>
+                        <p className="mt-3 flex items-center gap-3 text-sm text-black/60"><img src="/icons/madina-3d/contact-phone.webp" width={256} height={256} alt="" aria-hidden="true" className="public-contact-icon" /> Chine : {config.china_phone}</p>
+                        {config.facebook_url && <a href={config.facebook_url} target="_blank" rel="noreferrer" className="mt-3 flex items-center gap-3 text-sm text-black/60 transition hover:text-[#C8102E]"><img src="/icons/madina-3d/contact-facebook.webp" width={256} height={256} alt="" aria-hidden="true" className="public-contact-icon" /> Page Facebook</a>}
                     </div>
                 </div>
-                <div className="border-t border-black/10 py-5 text-center text-xs text-black/40">© {new Date().getFullYear()} Madina Import · Madagascar</div>
+                <div className="border-t border-black/10 py-5 text-center text-xs text-black/40">
+                    © {new Date().getFullYear()} Madina Import · Madagascar
+                </div>
             </footer>
         </div>
     );

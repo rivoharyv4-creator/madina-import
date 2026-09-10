@@ -169,6 +169,7 @@ class ModuleController extends Controller
             $contactRequest->status = 'lue';
         }
 
+        $contactRequest->reference_image_url = $contactRequest->reference_image_path ? route('contact-requests.reference-image', $id) : null;
         return Inertia::render('Module/PublicRequestShow', ['request' => $contactRequest]);
     }
 

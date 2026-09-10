@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SecureFileController extends Controller
@@ -20,6 +21,18 @@ class SecureFileController extends Controller
     public function product(string $filename): StreamedResponse
     {
         return $this->show('product',$filename);
+    }
+
+    public function contactReference(int $id): StreamedResponse
+    {
+        $path = DB::table('contact_requests')->where('id', $id)->value('reference_image_path');
+        $disk = Storage::disk('persistent');
+        abort_unless($path && $disk->exists($path), 404);
+
+        return $disk->response($path, basename($path), [
+            'Cache-Control'=>'private, no-store, max-age=0',
+            'X-Content-Type-Options'=>'nosniff',
+        ]);
     }
 
     public function payment(string $filename): StreamedResponse

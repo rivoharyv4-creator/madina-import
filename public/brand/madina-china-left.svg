@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 720" fill="none">
+  <title>Usine et logistique en Chine</title>
+  <desc>Décor vectoriel représentant une usine, des conteneurs et une grue.</desc>
+  <defs>
+    <linearGradient id="fadeLeft" x1="0" y1="0" x2="1" y2="0">
+      <stop stop-color="white" offset="0"/>
+      <stop stop-color="white" offset=".68" stop-opacity=".86"/>
+      <stop stop-color="white" offset="1" stop-opacity="0"/>
+    </linearGradient>
+    <mask id="leftMask"><rect width="560" height="720" fill="url(#fadeLeft)"/></mask>
+  </defs>
+  <g mask="url(#leftMask)" stroke="#98A2AA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <g opacity=".46">
+      <path d="M16 611h510M40 631h348M8 651h456M78 671h330"/>
+      <path fill="#98A2AA" fill-opacity=".08" d="M34 568V354l112-69 111 69v214H34Z"/>
+      <path d="M34 354h223M63 568V386h67v182M157 568V386h69v182"/>
+      <path d="M77 417h39m-39 35h39m-39 35h39m55-70h40m-40 35h40m-40 35h40"/>
+      <path fill="#98A2AA" fill-opacity=".08" d="M257 568V406l85-51 84 51v162H257Z"/>
+      <path d="M257 406h169M282 568V435h51v133m27 0V435h42v133"/>
+      <path fill="#98A2AA" fill-opacity=".1" d="M121 285V180h47v105m-34-105v-70h22v70"/>
+      <path d="M124 218h41m-41 24h41m-41 22h41"/>
+      <path fill="#98A2AA" fill-opacity=".09" d="M382 355V198h24v157h-24Z"/>
+      <path d="M394 198V92m-83 47h211v14H311m24-14 59-47 98 47m-98 14-52 202m64-202 50 202M445 153v91m8-91v91m-8 0h8l-4 14-4-14Z"/>
+    </g>
+    <g opacity=".7">
+      <rect x="9" y="526" width="104" height="55" rx="2" fill="#98A2AA" fill-opacity=".1"/>
+      <rect x="117" y="526" width="104" height="55" rx="2" fill="#98A2AA" fill-opacity=".1"/>
+      <rect x="225" y="526" width="104" height="55" rx="2" fill="#98A2AA" fill-opacity=".1"/>
+      <rect x="63" y="467" width="104" height="55" rx="2" fill="#98A2AA" fill-opacity=".1"/>
+      <rect x="171" y="467" width="104" height="55" rx="2" fill="#98A2AA" fill-opacity=".1"/>
+      <path d="M22 537v33m13-33v33m13-33v33m13-33v33m13-33v33m13-33v33m43-33v33m13-33v33m13-33v33m13-33v33m13-33v33m13-33v33m43-33v33m13-33v33m13-33v33m13-33v33m13-33v33m13-33v33" stroke-width="1"/>
+      <path d="M76 478v33m13-33v33m13-33v33m13-33v33m13-33v33m13-33v33m43-33v33m13-33v33m13-33v33m13-33v33m13-33v33m13-33v33" stroke-width="1"/>
+    </g>
+    <path opacity=".65" stroke="#C8102E" d="M18 600h278"/>
+  </g>
+</svg>

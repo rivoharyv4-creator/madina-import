@@ -27,6 +27,7 @@ Route::post('/contact',[PublicSiteController::class,'submitContact'])->middlewar
 Route::get('/dashboard', DashboardController::class)->middleware(['auth', 'verified', 'module.access:dashboard'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
+    Route::get('/contact-requests/{id}/reference-image', [SecureFileController::class, 'contactReference'])->middleware('module.access:demandes')->whereNumber('id')->name('contact-requests.reference-image');
     Route::middleware('super.admin')->group(function () {
         Route::get('/admin/utilisateurs',[UserManagementController::class,'index'])->name('admin.users.index');
         Route::post('/admin/utilisateurs',[UserManagementController::class,'store'])->name('admin.users.store');

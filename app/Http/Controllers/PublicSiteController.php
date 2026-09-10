@@ -114,7 +114,13 @@ class PublicSiteController extends Controller
 
     public function submitContact(PublicContactRequest $request)
     {
-        DB::table('contact_requests')->insert([...$request->safe()->except('website'),'created_at'=>now(),'updated_at'=>now()]);
+        $path = $request->file('reference_image')?->store('contact-references', 'persistent');
+        try {
+            DB::table('contact_requests')->insert([...$request->safe()->except(['website', 'reference_image']), 'reference_image_path'=>$path, 'created_at'=>now(), 'updated_at'=>now()]);
+        } catch (\Throwable $exception) {
+            if ($path) Storage::disk('persistent')->delete($path);
+            throw $exception;
+        }
         return back()->with('success','Merci. Votre demande a bien été transmise à notre équipe.');
     }
 

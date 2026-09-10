@@ -28,7 +28,7 @@ export default function Catalog({ products, categories, filters, pagination, pub
 
             <section className="border-b border-black/10 bg-white py-20 text-[#171717]">
                 <div className="public-container">
-                    <p className="public-kicker">Stock à Madagascar</p>
+                    <p className="public-kicker">Catalogue</p>
                     <h1 className="mt-5 text-4xl font-extrabold tracking-[-.04em] sm:text-[42px]">Produits disponibles</h1>
                     <p className="mt-5 max-w-2xl leading-8 text-[#5E5E5E]">Une sélection issue directement de notre stock. Pour un besoin spécifique, notre équipe peut également lancer une recherche en Chine.</p>
                 </div>

@@ -26,12 +26,17 @@ class PublicContactRequest extends FormRequest
             'message'=>['required','string','min:10','max:3000'],
             'consent'=>['accepted'],
             'website'=>['nullable','max:0'],
+            'reference_image'=>['nullable','image','mimes:jpg,jpeg,png,webp','max:2048'],
         ];
     }
 
     public function messages(): array
     {
         return [
+            'reference_image.image'=>'Veuillez choisir une image JPG, PNG ou WebP.',
+            'reference_image.mimes'=>'Formats acceptés : JPG, PNG et WebP.',
+            'reference_image.max'=>'L’image ne doit pas dépasser 2 Mo.',
+            'reference_image.uploaded'=>'L’image n’a pas pu être envoyée. Choisissez un fichier de 2 Mo maximum.',
             'consent.accepted'=>'Votre accord est nécessaire pour que nous puissions vous recontacter.',
             'website.max'=>'Votre demande n’a pas pu être envoyée.',
         ];

@@ -13,6 +13,7 @@ export default function PublicRequestShow({request}:{request:any}){
    <section className="panel">
     <div className="flex flex-wrap items-start justify-between gap-4 border-b border-gray-100 pb-5"><div><p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Besoin exprimé</p><h2 className="mt-2 text-xl font-black">{request.need}</h2></div><span className="status capitalize">{status(request.status)}</span></div>
     <div className="mt-6"><div className="mb-3 flex items-center gap-2 text-[#BD2433]"><MessageSquareText size={18}/><h3 className="text-sm font-bold text-[#2F2F2F]">Message du demandeur</h3></div><p className="whitespace-pre-wrap rounded-xl bg-[#F8F8F6] p-5 text-sm leading-7 text-gray-700">{request.message}</p></div>
+    {request.reference_image_url && <div className="mt-6"><h3 className="mb-3 text-sm font-bold">Image de référence</h3><a href={request.reference_image_url} target="_blank" rel="noreferrer" className="block w-fit rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#BD2433]"><img src={request.reference_image_url} alt="Image de référence jointe à la demande" className="max-h-96 max-w-full rounded-xl border border-gray-200 object-contain" loading="lazy"/><span className="mt-2 block text-sm font-semibold text-[#BD2433]">Ouvrir l’image en grand</span></a></div>}
    </section>
    <aside className="panel space-y-5">
     <Detail icon={UserRound} label="Nom" value={request.name}/>
