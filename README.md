@@ -37,7 +37,7 @@ La base incluse est destinée aux tests client. Avant une mise en production, re
 
 ### Laravel Cloud et conservation des données
 
-SQLite doit rester réservé au développement local : le système de fichiers des instances Laravel Cloud est éphémère. En production Cloud, attacher une base Laravel MySQL ou Serverless Postgres à l’environnement avant le premier déploiement. Laravel Cloud injectera alors les variables `DB_*` nécessaires.
+SQLite peut être utilisé sur un environnement Cloud temporaire de démonstration avec la base versionnée. Définir `DB_CONNECTION=sqlite`; sans `SQLITE_DATABASE`, l'application utilise automatiquement `database/database.sqlite`. Les anciennes variables MySQL `DB_DATABASE` et `DB_URL` sont ignorées par cette connexion SQLite. Le système de fichiers des instances Laravel Cloud reste toutefois éphémère : les écritures effectuées après le déploiement ne sont pas garanties lors d'un redémarrage ou d'un redéploiement. Pour une production durable, attacher une base Laravel MySQL ou Serverless Postgres à l'environnement. Laravel Cloud injectera alors les variables `DB_*` nécessaires.
 
 La commande de déploiement doit utiliser uniquement `php artisan migrate --force`. Ne jamais exécuter `migrate:fresh`, `db:wipe` ou `db:seed` automatiquement en production. Les migrations normales conservent les enregistrements existants. Les fichiers téléversés doivent être placés dans Laravel Object Storage plutôt que sur le disque local de l’instance.
 
