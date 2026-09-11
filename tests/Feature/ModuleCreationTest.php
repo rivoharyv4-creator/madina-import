@@ -398,7 +398,7 @@ class ModuleCreationTest extends TestCase
             ->where('order.number',$order->number)
             ->where('company.address','Lot IIB 106 Ambatomainty Antananarivo')
             ->where('company.contact','+261 34 98 732 08')
-            ->where('company.whatsapp','+86 158 0200 3702')
+            ->where('company.whatsapp','+261 38 26 011 11')
             ->where('company.email','contactmadinaimport@gmail.com')
             ->where('company.nif','4019196145')
             ->where('company.rcs','2025B00524')
