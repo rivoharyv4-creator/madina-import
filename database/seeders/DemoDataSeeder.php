@@ -171,7 +171,7 @@ class DemoDataSeeder extends Seeder
                 ]);
 
                 DB::table('tax_records')->updateOrInsert(['type' => $i % 2 ? 'IRSA' : 'impot_synthetique', 'period' => "DEMO-$suffix"], [
-                    'fiscal_year' => 2026, 'calculation_base' => $i % 2 ? 'salaires_bruts' : 'ca_encaisse', 'base_amount' => $gross,
+                    'fiscal_year' => 2026, 'calculation_base' => 'benefice_net', 'base_amount' => $gross,
                     'rate' => 5, 'calculated_amount' => $gross * .05, 'declared_amount' => null, 'due_at' => $now->copy()->addMonth()->toDateString(),
                     'declared_at' => null, 'paid_at' => null, 'status' => 'estimation', 'created_at' => $now, 'updated_at' => $now,
                 ]);

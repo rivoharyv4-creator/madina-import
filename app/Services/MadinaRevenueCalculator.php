@@ -2,12 +2,15 @@
 
 namespace App\Services;
 
+use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 final class MadinaRevenueCalculator
 {
+    public const ANNUAL_TAX_RATE = 5.0;
+
     /**
      * CA Madina = factures client - achats fournisseur - fret - autres coûts directs.
      *
@@ -24,6 +27,29 @@ final class MadinaRevenueCalculator
                 ->select('order_id', 'subtotal')
                 ->get()
         );
+    }
+
+    /**
+     * Bénéfice annuel = CA Madina - charges générales professionnelles.
+     *
+     * Les dépenses liées à une commande sont déjà déduites dans le CA Madina.
+     */
+    public function annualProfit(int $year): float
+    {
+        $start = Carbon::create($year, 1, 1)->startOfDay();
+        $end = $start->copy()->endOfYear();
+        $generalExpenses = (float) DB::table('expenses')
+            ->where('type', 'business')
+            ->whereNull('order_id')
+            ->whereBetween('spent_at', [$start->toDateString(), $end->toDateString()])
+            ->sum('amount');
+
+        return $this->between($start, $end) - $generalExpenses;
+    }
+
+    public function annualTax(int $year): float
+    {
+        return round(max(0, $this->annualProfit($year)) * self::ANNUAL_TAX_RATE / 100, 2);
     }
 
     /** @param Collection<int, object> $invoices */

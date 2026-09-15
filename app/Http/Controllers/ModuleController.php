@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exports\StyledModuleExport;
 use App\Http\Requests\StoreModuleRequest;
 use App\Services\BusinessCalculator;
+use App\Services\MadinaRevenueCalculator;
 use App\Services\NumberSequenceService;
 use App\Services\PersistentStorageService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -43,7 +44,7 @@ class ModuleController extends Controller
             'depenses' => ['title' => 'Dépenses', 'table' => 'expenses', 'primary' => 'Nouvelle dépense', 'editable' => true, 'columns' => ['spent_at' => 'Date', 'category' => 'Catégorie', 'description' => 'Description', 'type' => 'Type', 'amount' => 'Montant']],
             'salaires' => ['title' => 'Salaires et IRSA', 'table' => 'salaries', 'primary' => 'Préparer un salaire', 'editable' => true, 'related_action' => ['label' => 'Gérer les employés', 'href' => '/modules/employes'], 'columns' => ['employee_id' => 'Employé', 'month' => 'Mois', 'gross_salary' => 'Brut', 'irsa_amount' => 'IRSA', 'net_salary' => 'Net']],
             'employes' => ['title' => 'Employés', 'table' => 'employees', 'primary' => 'Nouvel employé', 'editable' => true, 'related_action' => ['label' => 'Retour aux salaires', 'href' => '/modules/salaires'], 'columns' => ['name' => 'Nom et prénom', 'position' => 'Poste', 'monthly_salary' => 'Salaire habituel', 'irsa_mode' => 'Mode IRSA', 'active' => 'Statut']],
-            'fiscalite' => ['title' => 'Fiscalité', 'table' => 'tax_records', 'primary' => 'Nouvelle estimation', 'editable' => true, 'columns' => ['type' => 'Impôt', 'period' => 'Période', 'calculation_base' => 'Base', 'calculated_amount' => 'Estimation', 'status' => 'Statut']],
+            'fiscalite' => ['title' => 'Fiscalité', 'table' => 'tax_records', 'primary' => 'Calculer la fiscalité annuelle', 'editable' => true, 'columns' => ['fiscal_year' => 'Année', 'base_amount' => 'Bénéfice annuel', 'rate' => 'Taux', 'calculated_amount' => 'Fiscalité estimée', 'status' => 'Statut']],
             'rapports' => ['title' => 'Rapports', 'table' => 'audit_logs', 'primary' => null, 'columns' => ['event' => 'Opération', 'auditable_type' => 'Module', 'user_id' => 'Utilisateur', 'created_at' => 'Date']],
             'parametres' => ['title' => 'Paramètres', 'table' => 'users', 'primary' => null, 'columns' => ['name' => 'Manager', 'email' => 'E-mail', 'created_at' => 'Créé le']],
         ][$module] ?? abort(404);
@@ -170,6 +171,7 @@ class ModuleController extends Controller
         }
 
         $contactRequest->reference_image_url = $contactRequest->reference_image_path ? route('contact-requests.reference-image', $id) : null;
+
         return Inertia::render('Module/PublicRequestShow', ['request' => $contactRequest]);
     }
 
@@ -265,7 +267,7 @@ class ModuleController extends Controller
         return $this->storage->download($path, $filename);
     }
 
-    public function update(StoreModuleRequest $request, string $module, int $id, BusinessCalculator $calculator)
+    public function update(StoreModuleRequest $request, string $module, int $id, BusinessCalculator $calculator, MadinaRevenueCalculator $revenueCalculator)
     {
         $config = $this->config($module);
         abort_unless($config['editable'] ?? false, 404);
@@ -275,8 +277,8 @@ class ModuleController extends Controller
         } $old = $query->find($id);
         abort_unless($old, 404);
         $data = $request->validated();
-        DB::transaction(function () use ($request, $config, $module, $id, $old, $data, $calculator) {
-            $this->applyUpdate($module, $id, $old, $data, $request->user()->id, $calculator);
+        DB::transaction(function () use ($request, $config, $module, $id, $old, $data, $calculator, $revenueCalculator) {
+            $this->applyUpdate($module, $id, $old, $data, $request->user()->id, $calculator, $revenueCalculator);
             DB::table('audit_logs')->insert(['user_id' => $request->user()->id, 'event' => $module.'.modifie', 'auditable_type' => $config['table'], 'auditable_id' => $id, 'old_values' => $this->auditJson($old), 'new_values' => $this->auditJson($data), 'ip_address' => $request->ip(), 'created_at' => now()]);
         });
 
@@ -297,10 +299,10 @@ class ModuleController extends Controller
         return redirect()->route('modules.index', 'employes')->with('success', 'Employé retiré de l’entreprise. Son historique salarial est conservé.');
     }
 
-    public function store(StoreModuleRequest $request, string $module, NumberSequenceService $numbers, BusinessCalculator $calculator)
+    public function store(StoreModuleRequest $request, string $module, NumberSequenceService $numbers, BusinessCalculator $calculator, MadinaRevenueCalculator $revenueCalculator)
     {
         $data = $request->validated();
-        $result = DB::transaction(function () use ($module, $data, $request, $numbers, $calculator) {
+        $result = DB::transaction(function () use ($module, $data, $request, $numbers, $calculator, $revenueCalculator) {
             $now = now();
             $id = match ($module) {
                 'clients' => DB::table('clients')->insertGetId([...$data, 'number' => $numbers->next('client'), 'active' => $data['active'] ?? true, 'credit_balance' => 0, 'created_at' => $now, 'updated_at' => $now]),
@@ -317,7 +319,7 @@ class ModuleController extends Controller
                 'depenses' => DB::table('expenses')->insertGetId([...$data, 'source_type' => null, 'source_id' => null, 'created_at' => $now, 'updated_at' => $now]),
                 'employes' => DB::table('employees')->insertGetId([...$data, 'active' => $data['active'] ?? true, 'created_at' => $now, 'updated_at' => $now]),
                 'salaires' => $this->createSalary($data, $calculator),
-                'fiscalite' => DB::table('tax_records')->insertGetId([...Arr::except($data, 'rate'), 'rate' => $data['rate'], 'calculated_amount' => (float) $calculator->commission($data['base_amount'], $data['rate']), 'created_at' => $now, 'updated_at' => $now]),
+                'fiscalite' => DB::table('tax_records')->insertGetId([...$this->annualTaxData($data, $revenueCalculator), 'created_at' => $now, 'updated_at' => $now]),
                 default => abort(404),
             };
             if ($module === 'devis' && ! empty($data['quote_request_id'])) {
@@ -611,6 +613,24 @@ class ModuleController extends Controller
         return $id;
     }
 
+    private function annualTaxData(array $data, MadinaRevenueCalculator $revenueCalculator): array
+    {
+        $year = (int) $data['fiscal_year'];
+
+        return [
+            'type' => 'impot_synthetique',
+            'period' => (string) $year,
+            'fiscal_year' => $year,
+            'calculation_base' => 'benefice_net',
+            'base_amount' => $revenueCalculator->annualProfit($year),
+            'rate' => MadinaRevenueCalculator::ANNUAL_TAX_RATE,
+            'calculated_amount' => $revenueCalculator->annualTax($year),
+            'declared_amount' => $data['declared_amount'] ?? null,
+            'due_at' => $data['due_at'] ?? null,
+            'status' => $data['status'] ?? 'estimation',
+        ];
+    }
+
     private function editValues(string $module, object $record): array
     {
         $values = (array) $record;
@@ -644,7 +664,7 @@ class ModuleController extends Controller
         return $values;
     }
 
-    private function applyUpdate(string $module, int $id, object $old, array $data, int $userId, BusinessCalculator $calculator): void
+    private function applyUpdate(string $module, int $id, object $old, array $data, int $userId, BusinessCalculator $calculator, MadinaRevenueCalculator $revenueCalculator): void
     {
         if ($module === 'fournisseurs') {
             $products = $data['products'] ?? [];
@@ -745,7 +765,7 @@ class ModuleController extends Controller
             return;
         }
         if ($module === 'fiscalite') {
-            DB::table('tax_records')->where('id', $id)->update([...Arr::except($data, 'rate'), 'rate' => $data['rate'], 'calculated_amount' => (float) $calculator->commission($data['base_amount'], $data['rate']), 'updated_at' => now()]);
+            DB::table('tax_records')->where('id', $id)->update([...$this->annualTaxData($data, $revenueCalculator), 'updated_at' => now()]);
 
             return;
         }
@@ -998,6 +1018,9 @@ class ModuleController extends Controller
         $invoices = $module === 'paiements' ? DB::table('invoices')->orderByDesc('id')->get()->map(fn ($x) => ['value' => $x->id, 'label' => $x->number])->all() : [];
         $users = $module === 'demandes-devis' ? DB::table('users')->orderBy('name')->get()->map(fn ($x) => ['value' => $x->id, 'label' => $x->name])->all() : [];
         $originOrders = [];
+        $annualTax = $module === 'fiscalite'
+            ? $this->annualTaxData(['fiscal_year' => (int) date('Y')], app(MadinaRevenueCalculator::class))
+            : [];
         if ($module === 'stock') {
             $sourceOrders = DB::table('orders')->whereNull('deleted_at')->orderByDesc('id')->get(['id', 'number']);
             $containers = DB::table('shipments')->whereIn('order_id', $sourceOrders->pluck('id'))->whereNotNull('container_reference')->get(['order_id', 'container_reference'])->groupBy('order_id');
@@ -1072,7 +1095,7 @@ class ModuleController extends Controller
             'depenses' => [$select('category', 'Catégorie', [['value' => 'achat', 'label' => 'Achat'], ['value' => 'logistique', 'label' => 'Logistique'], ['value' => 'marketing', 'label' => 'Marketing'], ['value' => 'transport', 'label' => 'Transport'], ['value' => 'loyer_depot_chine', 'label' => 'Loyer dépôt en Chine'], ['value' => 'loyer_depot_madagascar', 'label' => 'Loyer dépôt à Madagascar'], ['value' => 'loyer_bureau', 'label' => 'Loyer de bureau'], ['value' => 'services_publics', 'label' => 'Eau, électricité et services'], ['value' => 'salaire', 'label' => 'Salaire'], ['value' => 'IRSA', 'label' => 'IRSA'], ['value' => 'autre', 'label' => 'Autre']]), $input('amount', 'Montant (Ar)', 'number'), $input('spent_at', 'Date', 'date', true, $today), $select('type', 'Type de dépense', [['value' => 'business', 'label' => 'Professionnelle'], ['value' => 'personnel', 'label' => 'Personnelle']]), $input('description', 'Description', 'textarea'), $select('order_id', 'Commande liée (optionnelle)', $orders, false), $select('status', 'Statut', $o(['paye', 'en_attente']), true, 'paye')],
             'employes' => [$input('name', 'Nom et prénom'), $input('position', 'Poste'), $input('monthly_salary', 'Salaire mensuel habituel (Ar)', 'number'), $select('irsa_mode', 'Mode IRSA par défaut', $o(['pourcentage', 'fixe'])), $input('irsa_value', 'Taux (%) ou montant IRSA', 'number'), $select('active', 'Statut', [['value' => 1, 'label' => 'Actif'], ['value' => 0, 'label' => 'Inactif']], true, 1), $input('left_at', 'Date de départ', 'date', false), $input('departure_reason', 'Motif du départ', 'textarea', false)],
             'salaires' => [$select('employee_id', 'Employé', $employees), $input('month', 'Mois', 'month'), $input('gross_salary', 'Salaire brut (Ar)', 'number'), $select('irsa_mode', 'Mode IRSA', $o(['pourcentage', 'fixe'])), $input('irsa_value', 'Taux (%) ou montant fixe', 'number'), $input('paid_at', 'Date de paiement', 'date', false), $select('status', 'Statut', $o(['a_payer', 'paye']))],
-            'fiscalite' => [$select('type', 'Type', $o(['IRSA', 'impot_synthetique'])), $input('period', 'Période'), $input('fiscal_year', 'Année fiscale', 'number', true, date('Y')), $select('calculation_base', 'Base', $o(['ca_facture', 'ca_encaisse', 'salaires_bruts'])), $input('base_amount', 'Montant de la base (Ar)', 'number'), $input('rate', 'Taux (%)', 'number'), $input('declared_amount', 'Montant déclaré (Ar)', 'number', false), $input('due_at', 'Date limite', 'date', false), $select('status', 'Statut', $o(['estimation', 'a_declarer', 'declare', 'paye']), true, 'estimation')],
+            'fiscalite' => [$input('fiscal_year', 'Année fiscale', 'number', true, date('Y')), $input('base_amount', 'Bénéfice annuel calculé (Ar)', 'number', false, $annualTax['base_amount']) + ['readOnly' => true], $input('rate', 'Taux annuel (%)', 'number', false, MadinaRevenueCalculator::ANNUAL_TAX_RATE) + ['readOnly' => true], $input('calculated_amount', 'Fiscalité estimée (Ar)', 'number', false, $annualTax['calculated_amount']) + ['readOnly' => true], $input('declared_amount', 'Montant déclaré (Ar)', 'number', false), $input('due_at', 'Date limite', 'date', false), $select('status', 'Statut', $o(['estimation', 'a_declarer', 'declare', 'paye']), true, 'estimation')],
             default => abort(404),
         };
     }
