@@ -24,7 +24,7 @@ export default function PublicContactForm({compact=false,flash}:{compact?:boolea
   <div className="md:col-span-2">
    <Field label="Image de référence (facultatif)" error={errors.reference_image}>
     <span className="mb-2 block text-sm leading-6 text-[#5E5E5E]">Ajoutez une photo du produit recherché. JPG, PNG ou WebP — 2 Mo maximum.</span>
-    <input ref={imageInput} type="file" accept="image/jpeg,image/png,image/webp" disabled={processing} aria-invalid={!!errors.reference_image} className="public-field !rounded-xl text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-[#C8102E] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white" onChange={event=>{
+    <input ref={imageInput} type="file" accept="image/jpeg,image/png,image/webp" disabled={processing} aria-invalid={!!errors.reference_image} className="peer sr-only" onChange={event=>{
      const file=event.target.files?.[0];clearErrors('reference_image');
      if(!file){setData('reference_image',null);return;}
      if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>2*1024*1024){
@@ -32,6 +32,10 @@ export default function PublicContactForm({compact=false,flash}:{compact?:boolea
      }
      setData('reference_image',file);
     }}/>
+    <span className="public-field flex min-h-[62px] cursor-pointer items-center gap-3 !rounded-xl text-sm peer-focus-visible:ring-4 peer-focus-visible:ring-[#C8102E]/20">
+     <span className="shrink-0 rounded-lg bg-[#C8102E] px-3 py-2 font-semibold text-white">Choisir un fichier</span>
+     <span className="min-w-0 truncate text-[#5E5E5E]">{data.reference_image?.name||'Aucun fichier choisi'}</span>
+    </span>
    </Field>
    {preview&&<div className="mt-3 flex flex-wrap items-center gap-4"><img src={preview} alt="Aperçu de votre image de référence" className="h-28 w-36 rounded-lg border border-black/10 object-contain"/><button type="button" disabled={processing} onClick={removeImage} className="public-button-secondary">Retirer l’image</button></div>}
   </div>

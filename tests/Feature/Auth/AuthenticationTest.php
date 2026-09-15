@@ -4,6 +4,7 @@ namespace Tests\Feature\Auth;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PragmaRX\Google2FA\Google2FA;
 use Tests\TestCase;
 
 class AuthenticationTest extends TestCase
@@ -19,11 +20,18 @@ class AuthenticationTest extends TestCase
 
     public function test_users_can_authenticate_using_the_login_screen(): void
     {
-        $user = User::factory()->create();
+        $google2fa = new Google2FA;
+        $secret = $google2fa->generateSecretKey(32);
+        $user = User::factory()->create([
+            'two_factor_secret' => $secret,
+            'two_factor_recovery_codes' => [],
+            'two_factor_confirmed_at' => now(),
+        ]);
 
         $response = $this->post(route('login', absolute: false), [
             'email' => $user->email,
             'password' => 'password',
+            'code' => $google2fa->getCurrentOtp($secret),
         ]);
 
         $this->assertAuthenticated();

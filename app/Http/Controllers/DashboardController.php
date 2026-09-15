@@ -2,17 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\MadinaRevenueCalculator;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class DashboardController extends Controller
 {
-    public function __invoke()
+    public function __invoke(MadinaRevenueCalculator $revenueCalculator)
     {
         $month = now()->startOfMonth();
-        $invoiced = (float) DB::table('invoices')->where('issued_at', '>=', $month)->sum('subtotal');
+        $madinaRevenue = $revenueCalculator->between($month, now()->endOfMonth());
         $received = (float) DB::table('client_payments')->where('paid_at', '>=', $month)->where('status', 'valide')->sum('amount');
         $business = (float) DB::table('expenses')->where('spent_at', '>=', $month)->where('type', 'business')->sum('amount');
+        $generalBusiness = (float) DB::table('expenses')->where('spent_at', '>=', $month)->where('type', 'business')->whereNull('order_id')->sum('amount');
         $personal = (float) DB::table('expenses')->where('spent_at', '>=', $month)->where('type', 'personnel')->sum('amount');
         $supplier = (float) DB::table('supplier_payments')->where('paid_at', '>=', $month)->sum('amount');
         $commission = (float) DB::table('orders')->where('ordered_at', '>=', $month)->sum('commission_amount');
@@ -34,14 +36,13 @@ class DashboardController extends Controller
                 ->pluck('total', 'month_key');
         };
 
-        $monthlyInvoices = $monthlyTotals('invoices', 'issued_at', 'subtotal');
         $monthlyPayments = $monthlyTotals('client_payments', 'paid_at', 'amount', fn ($query) => $query->where('status', 'valide'));
         $monthlyExpenses = $monthlyTotals('expenses', 'spent_at', 'amount');
         $monthlySupplierPayments = $monthlyTotals('supplier_payments', 'paid_at', 'amount');
-        $chart = collect(range(5, 0))->map(function ($i) use ($monthlyInvoices, $monthlyPayments, $monthlyExpenses, $monthlySupplierPayments) {
+        $chart = collect(range(5, 0))->map(function ($i) use ($revenueCalculator, $monthlyPayments, $monthlyExpenses, $monthlySupplierPayments) {
             $date = now()->subMonths($i)->startOfMonth();
             $key = $date->format('Y-m');
-            $facture = (float) ($monthlyInvoices[$key] ?? 0);
+            $facture = $revenueCalculator->between($date, $date->copy()->endOfMonth());
             $encaisse = (float) ($monthlyPayments[$key] ?? 0);
             $depenses = (float) ($monthlyExpenses[$key] ?? 0) + (float) ($monthlySupplierPayments[$key] ?? 0);
 
@@ -53,7 +54,7 @@ class DashboardController extends Controller
         $topProducts = DB::table('order_items')->join('orders', 'orders.id', '=', 'order_items.order_id')->whereNull('orders.deleted_at')->select('order_items.name', DB::raw('sum(order_items.quantity) as quantity'))->groupBy('order_items.name')->orderByDesc('quantity')->limit(6)->get()->map(fn ($row) => ['name' => $row->name, 'quantity' => (float) $row->quantity])->values();
 
         return Inertia::render('Dashboard', [
-            'metrics' => ['invoiced' => $invoiced, 'received' => $received, 'profit' => $received - $business - $personal - $supplier, 'cash' => $received - $business - $personal - $supplier, 'commission' => $commission, 'business' => $business, 'personal' => $personal],
+            'metrics' => ['invoiced' => $madinaRevenue, 'received' => $received, 'profit' => $madinaRevenue - $generalBusiness, 'cash' => $received - $business - $personal - $supplier, 'commission' => $commission, 'business' => $business, 'personal' => $personal],
             'counts' => [
                 'orders' => DB::table('orders')->whereNotIn('status', ['livre', 'cloture', 'annule'])->count(),
                 'delivered' => DB::table('orders')->where('status', 'livre')->count(),

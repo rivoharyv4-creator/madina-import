@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Admin\UserTwoFactorController;
 use App\Http\Controllers\BrandAssetController;
 use App\Http\Controllers\ModuleController;
 use App\Http\Controllers\ProfileController;
@@ -32,6 +33,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/admin/utilisateurs',[UserManagementController::class,'index'])->name('admin.users.index');
         Route::post('/admin/utilisateurs',[UserManagementController::class,'store'])->name('admin.users.store');
         Route::put('/admin/utilisateurs/{user}',[UserManagementController::class,'update'])->name('admin.users.update');
+        Route::get('/admin/utilisateurs/{user}/double-authentification',[UserTwoFactorController::class,'show'])->name('admin.users.two-factor.show');
+        Route::post('/admin/utilisateurs/{user}/double-authentification',[UserTwoFactorController::class,'setup'])->middleware('throttle:6,1')->name('admin.users.two-factor.setup');
+        Route::post('/admin/utilisateurs/{user}/double-authentification/confirmer',[UserTwoFactorController::class,'confirm'])->middleware('throttle:6,1')->name('admin.users.two-factor.confirm');
+        Route::delete('/admin/utilisateurs/{user}/double-authentification',[UserTwoFactorController::class,'destroy'])->middleware('throttle:6,1')->name('admin.users.two-factor.destroy');
     });
     Route::get('/product-photo/{filename}',[SecureFileController::class,'product'])->where('filename','[A-Za-z0-9._-]+')->name('product.photo');
     Route::get('/purchase-proof/{filename}',[SecureFileController::class,'payment'])->where('filename','[A-Za-z0-9._-]+')->name('purchase.proof');

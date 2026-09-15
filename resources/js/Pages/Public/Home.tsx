@@ -8,7 +8,18 @@ import PublicLayout, { PublicConfig } from '@/Layouts/PublicLayout';
 import { Head, Link, usePage } from '@inertiajs/react';
 import {
     ArrowRight,
+    ClipboardCheck,
+    Globe2,
+    Handshake,
+    Ship,
 } from 'lucide-react';
+
+const heroBenefits = [
+    [Globe2, 'Présence en Chine'],
+    [Handshake, 'Accompagnement personnalisé'],
+    [ClipboardCheck, 'Suivi de commande'],
+    [Ship, 'Fret aérien et maritime'],
+] as const;
 
 const faq = [
     ['Quels types de produits pouvez-vous rechercher ?', 'Nous étudions les demandes de produits, équipements et machines autorisés à l’importation, pour les professionnels comme pour les particuliers.'],
@@ -53,15 +64,10 @@ export default function Home({ products, publicConfig }: { products: CatalogProd
                         </div>
 
                         <div className="relative mx-auto mb-4 grid w-[calc(100%-2rem)] max-w-[1160px] lg:absolute lg:bottom-6 lg:left-1/2 lg:mb-0 lg:-translate-x-1/2 lg:grid-cols-4">
-                            {[
-                                ['/icons/madina-3d/hero-china.webp', 'Présence en Chine'],
-                                ['/icons/madina-3d/complete-support.webp', 'Accompagnement personnalisé'],
-                                ['/icons/madina-3d/hero-tracking.webp', 'Suivi de commande'],
-                                ['/icons/madina-3d/hero-freight.webp', 'Fret aérien et maritime'],
-                            ].map(([icon, label]) => (
+                            {heroBenefits.map(([Icon, label]) => (
                                 <div key={label} className="hero-benefit flex items-center gap-4 border-b border-white/20 px-5 py-5 last:border-0 lg:border-b-0 lg:border-r">
-                                    <span className="hero-benefit-icon">
-                                        <img src={icon} width="256" height="256" alt="" aria-hidden="true" />
+                                    <span className="hero-benefit-icon" aria-hidden="true">
+                                        <Icon size={30} strokeWidth={2.15} />
                                     </span>
                                     <strong className="text-[13px] leading-5 text-white drop-shadow-sm">{label}</strong>
                                 </div>

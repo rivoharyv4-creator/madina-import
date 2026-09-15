@@ -55,6 +55,8 @@ class PublicSiteTest extends TestCase
         $this->get('/contact')->assertOk()->assertInertia(fn (Assert $page) => $page
             ->component('Public/Contact')
             ->where('publicConfig.address', 'Lot IIB 106, Ambatomainty - Manjakaray, Antananarivo')
+            ->where('publicConfig.madagascar_phone', '+261 38 26 011 11')
+            ->where('publicConfig.whatsapp', '+261 38 26 011 11')
         );
 
         $payload = ['name' => 'Entreprise Test', 'contact' => '+261340000000', 'client_type' => 'entreprise', 'need' => 'Machine de production', 'message' => 'Nous souhaitons étudier une machine pour notre atelier.', 'consent' => true, 'website' => ''];

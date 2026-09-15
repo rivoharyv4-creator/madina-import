@@ -1,19 +1,19 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, useForm } from '@inertiajs/react';
-import { Check, KeyRound, Pencil, ShieldCheck, UserPlus, UsersRound, X } from 'lucide-react';
+import { Head, Link, useForm } from '@inertiajs/react';
+import { Check, KeyRound, Pencil, ShieldCheck, Smartphone, UserPlus, UsersRound, X } from 'lucide-react';
 import { FormEvent, ReactNode, useState } from 'react';
 
-type ManagedUser={id:number;name:string;email:string;role:'super_admin'|'assistant'|'user';permissions:string[]|null;active:boolean;created_at:string};
+type ManagedUser={id:number;name:string;email:string;role:'super_admin'|'assistant'|'user';permissions:string[]|null;active:boolean;created_at:string;two_factor_enabled:boolean};
 type MenuOption={value:string;label:string};
-type FormData={name:string;email:string;role:'assistant'|'user';password:string;permissions:string[];active:boolean};
+type FormData={name:string;email:string;role:'assistant'|'user';password:string;recovery_phrase:string;permissions:string[];active:boolean};
 
-const empty:FormData={name:'',email:'',role:'assistant',password:'',permissions:[],active:true};
+const empty:FormData={name:'',email:'',role:'assistant',password:'',recovery_phrase:'',permissions:[],active:true};
 
 export default function UsersIndex({users,menuOptions}:{users:ManagedUser[];menuOptions:MenuOption[]}){
  const [editing,setEditing]=useState<number|null>(null);
  const {data,setData,post,put,processing,errors,reset,clearErrors}=useForm<FormData>(empty);
  const startCreate=()=>{setEditing(null);reset();clearErrors();};
- const startEdit=(user:ManagedUser)=>{setEditing(user.id);clearErrors();setData({name:user.name,email:user.email,role:user.role==='assistant'?'assistant':'user',password:'',permissions:user.permissions||[],active:user.active});};
+ const startEdit=(user:ManagedUser)=>{setEditing(user.id);clearErrors();setData({name:user.name,email:user.email,role:user.role==='assistant'?'assistant':'user',password:'',recovery_phrase:'',permissions:user.permissions||[],active:user.active});};
  const toggle=(permission:string)=>setData('permissions',data.permissions.includes(permission)?data.permissions.filter(item=>item!==permission):[...data.permissions,permission]);
  const submit=(event:FormEvent)=>{event.preventDefault();const options={preserveScroll:true,onSuccess:()=>startCreate()};editing?put(`/admin/utilisateurs/${editing}`,options):post('/admin/utilisateurs',options);};
 
@@ -25,8 +25,8 @@ export default function UsersIndex({users,menuOptions}:{users:ManagedUser[];menu
     <div className="divide-y divide-gray-100">
      {users.map(user=><article key={user.id} className="flex flex-col gap-4 p-5 transition hover:bg-[#FCF108]/[.035] sm:flex-row sm:items-center">
       <div className={`grid size-11 shrink-0 place-items-center rounded-xl ${user.role==='super_admin'?'bg-[#FCF108]/30 text-[#756e00]':'bg-[#BD2433]/10 text-[#BD2433]'}`}>{user.role==='super_admin'?<ShieldCheck size={21}/>:<UsersRound size={21}/>}</div>
-      <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><strong className="truncate text-sm">{user.name}</strong><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${user.active?'bg-emerald-50 text-emerald-700':'bg-gray-100 text-gray-400'}`}>{user.active?'Actif':'Désactivé'}</span></div><p className="mt-0.5 truncate text-xs text-gray-400">{user.email}</p><p className="mt-2 text-[11px] text-gray-500">{user.role==='super_admin'?'Super administrateur · accès complet':`${user.role==='assistant'?'Assistant':'Utilisateur'} · ${user.permissions?.length||0} menu(s) autorisé(s)`}</p></div>
-      {user.role!=='super_admin'&&<button type="button" onClick={()=>startEdit(user)} className="btn-secondary shrink-0"><Pencil size={15}/>Modifier les accès</button>}
+      <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><strong className="truncate text-sm">{user.name}</strong><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${user.active?'bg-emerald-50 text-emerald-700':'bg-gray-100 text-gray-400'}`}>{user.active?'Actif':'Désactivé'}</span><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${user.two_factor_enabled?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700'}`}>2FA {user.two_factor_enabled?'activée':'inactive'}</span></div><p className="mt-0.5 truncate text-xs text-gray-400">{user.email}</p><p className="mt-2 text-[11px] text-gray-500">{user.role==='super_admin'?'Super administrateur · accès complet':`${user.role==='assistant'?'Assistant':'Utilisateur'} · ${user.permissions?.length||0} menu(s) autorisé(s)`}</p></div>
+      <div className="flex shrink-0 flex-wrap gap-2"><Link href={`/admin/utilisateurs/${user.id}/double-authentification`} className="btn-secondary"><Smartphone size={15}/>Google Authenticator</Link>{user.role!=='super_admin'&&<button type="button" onClick={()=>startEdit(user)} className="btn-secondary"><Pencil size={15}/>Modifier les accès</button>}</div>
      </article>)}
     </div>
    </section>
@@ -38,6 +38,7 @@ export default function UsersIndex({users,menuOptions}:{users:ManagedUser[];menu
      <Field label="Adresse e-mail" error={errors.email}><input type="email" className="field" value={data.email} onChange={e=>setData('email',e.target.value)} placeholder="assistant@madina-import.mg" required/></Field>
      <Field label="Type de compte" error={errors.role}><select className="field" value={data.role} onChange={e=>setData('role',e.target.value as FormData['role'])}><option value="assistant">Assistant</option><option value="user">Autre utilisateur</option></select></Field>
      <Field label={editing?'Nouveau mot de passe (optionnel)':'Mot de passe'} error={errors.password}><div className="relative"><KeyRound size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300"/><input type="password" className="field pl-10" value={data.password} onChange={e=>setData('password',e.target.value)} minLength={8} required={!editing} placeholder="8 caractères minimum"/></div></Field>
+     <Field label={editing?'Nouvelle phrase secrète (optionnelle)':'Phrase secrète de récupération'} error={errors.recovery_phrase}><div className="relative"><ShieldCheck size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300"/><input type="password" className="field pl-10" value={data.recovery_phrase} onChange={e=>setData('recovery_phrase',e.target.value)} minLength={12} required={!editing} autoComplete="new-password" placeholder="12 caractères minimum"/></div><p className="mt-1 text-[10px] leading-4 text-gray-400">À transmettre à l’administrateur par un canal sûr.</p></Field>
     </div>
     <div>
      <div className="mb-3 flex items-center justify-between"><div><h3 className="text-sm font-bold">Menus autorisés</h3><p className="text-[11px] text-gray-400">Les pages non cochées seront également bloquées par URL.</p></div><button type="button" onClick={()=>setData('permissions',data.permissions.length===menuOptions.length?[]:menuOptions.map(item=>item.value))} className="text-xs font-semibold text-[#BD2433]">{data.permissions.length===menuOptions.length?'Tout retirer':'Tout sélectionner'}</button></div>

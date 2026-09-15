@@ -4,7 +4,7 @@ import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
 import GuestLayout from '@/Layouts/GuestLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { ShieldAlert } from 'lucide-react';
+import { ShieldAlert, Smartphone } from 'lucide-react';
 import { FormEventHandler } from 'react';
 
 export default function Login({
@@ -17,6 +17,7 @@ export default function Login({
     const { data, setData, post, processing, errors, reset } = useForm({
         email: '',
         password: '',
+        code: '',
         remember: false as boolean,
     });
 
@@ -24,7 +25,7 @@ export default function Login({
         e.preventDefault();
 
         post(window.location.pathname, {
-            onFinish: () => reset('password'),
+            onFinish: () => reset('password', 'code'),
         });
     };
 
@@ -73,6 +74,25 @@ export default function Login({
                         onChange={(e) => setData('password', e.target.value)}
                     />
                     {errors.password&&<p className="mt-2 text-xs text-red-600">{errors.password}</p>}
+                </div>
+
+                <div className="mt-4">
+                    <InputLabel htmlFor="code" value="Google Authenticator" />
+                    <div className="relative mt-1">
+                        <Smartphone size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <TextInput
+                            id="code"
+                            name="code"
+                            value={data.code}
+                            className="block w-full pl-10 tracking-[.12em]"
+                            autoComplete="one-time-code"
+                            inputMode="text"
+                            maxLength={32}
+                            aria-invalid={Boolean(errors.code)}
+                            onChange={(e) => setData('code', e.target.value)}
+                        />
+                    </div>
+                    {errors.code&&<p className="mt-2 text-xs text-red-600">{errors.code}</p>}
                 </div>
 
                 <div className="mt-4 block">

@@ -62,8 +62,8 @@ class PdfDocumentTest extends TestCase
         $this->assertStringContainsString('3.700.000 Ar',$html);
         $this->assertStringContainsString('<tr class="grand"><td>Total</td><td class="value">6.750.000 Ar</td></tr>',$html);
         $this->assertStringContainsString('Lot IIB 106 Ambatomainty Antananarivo',$html);
-        $this->assertStringContainsString('+261 34 98 732 08',$html);
-        $this->assertStringContainsString('+261 38 26 011 11',$html);
+        $this->assertStringContainsString('Tél. : +261 38 26 011 11',$html);
+        $this->assertStringContainsString('WhatsApp : +261 38 26 011 11',$html);
         $this->assertStringContainsString('contactmadinaimport@gmail.com',$html);
         $this->assertStringContainsString('NIF : 4019196145',$html);
         $this->assertStringContainsString('RCS : 2025B00524',$html);

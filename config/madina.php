@@ -4,7 +4,7 @@ return [
     'company' => [
         'name' => env('COMPANY_NAME','MADINA IMPORT'),
         'email' => env('COMPANY_EMAIL','contactmadinaimport@gmail.com'),
-        'contact' => env('COMPANY_CONTACT','+261 34 98 732 08'),
+        'contact' => env('COMPANY_CONTACT','+261 38 26 011 11'),
         'whatsapp' => env('COMPANY_WHATSAPP','+261 38 26 011 11'),
         'address' => env('COMPANY_ADDRESS','Lot IIB 106, Ambatomainty - Manjakaray, Antananarivo'),
         'timezone' => env('COMPANY_TIMEZONE','Asia/Shanghai'),
@@ -13,7 +13,7 @@ return [
         'stat' => env('COMPANY_STAT','46101 11 2025 0 10528'),
     ],
     'public' => [
-        'madagascar_phone' => env('PUBLIC_MADAGASCAR_PHONE', '+261 34 98 732 08'),
+        'madagascar_phone' => env('PUBLIC_MADAGASCAR_PHONE', '+261 38 26 011 11'),
         'china_phone' => env('PUBLIC_CHINA_PHONE', '+86 158 0200 3702'),
         'whatsapp' => env('PUBLIC_WHATSAPP', '+261 38 26 011 11'),
         'facebook_url' => env('PUBLIC_FACEBOOK_URL', 'https://www.facebook.com/profile.php?id=61553409549693'),
