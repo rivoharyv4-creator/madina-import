@@ -22,12 +22,14 @@ const heroBenefits = [
 ] as const;
 
 const faq = [
-    ['Quels types de produits pouvez-vous rechercher ?', 'Nous étudions les demandes de produits, équipements et machines autorisés à l’importation, pour les professionnels comme pour les particuliers.'],
-    ['Comment obtenir une estimation ?', 'Décrivez votre besoin, la quantité et vos contraintes. Notre équipe revient vers vous avec les informations nécessaires pour cadrer l’estimation.'],
-    ['Proposez-vous le fret aérien et maritime ?', 'Oui. Le mode est choisi selon le volume, le poids, le délai et la nature du produit.'],
-    ['Comment suivre une commande ?', 'Utilisez le numéro de commande et le code sécurisé transmis par votre interlocuteur Madina Import.'],
-    ['Puis-je acheter un produit déjà disponible à Madagascar ?', 'Oui, les produits publiés dans le catalogue sont issus du stock disponible.'],
-    ['Quels documents dois-je fournir ?', 'Cela dépend du produit et du projet. Nous vous précisons les éléments requis avant toute validation.'],
+    ['Quels services propose Madina Import ?', 'Nous proposons le sourcing et la vérification de fournisseurs, l’import clé en main ainsi que l’accompagnement des projets d’équipement professionnel. Selon l’offre choisie, nous pouvons coordonner la négociation, l’achat, le paiement en RMB, le transport et les formalités liées au projet.'],
+    ['Quels produits pouvez-vous rechercher ?', 'Nous étudions les demandes de produits, d’équipements et de machines autorisés à l’importation, pour les professionnels comme pour les particuliers.'],
+    ['Comment demander un devis ?', 'Indiquez le produit recherché, la quantité, l’utilisation prévue, vos exigences, votre budget et, si possible, ajoutez une photo de référence. Notre équipe vous recontacte pour préciser la demande avant d’établir le devis.'],
+    ['Que se passe-t-il après la validation du devis ?', 'Après votre validation et le paiement de l’acompte convenu, nous lançons la commande auprès du fournisseur, puis nous coordonnons l’expédition, le suivi, l’arrivée à Madagascar et la livraison.'],
+    ['Proposez-vous le fret aérien et maritime ?', 'Oui. Le mode de transport est choisi avec vous selon le volume, le poids, la nature du produit, le délai souhaité et le budget disponible.'],
+    ['Comment suivre ma commande ?', 'Vous pouvez rechercher votre expédition avec le numéro de commande et le tracking number transmis, ou avec le nom complet du destinataire et son numéro de téléphone. Seules les informations utiles au suivi sont affichées.'],
+    ['Puis-je acheter un produit déjà disponible à Madagascar ?', 'Oui. Les produits publiés dans notre catalogue correspondent aux références disponibles ou proposées localement. Les informations de disponibilité sont confirmées lors de votre prise de contact.'],
+    ['Les formalités douanières sont-elles incluses ?', 'Elles peuvent être prises en charge dans le cadre de l’accompagnement clé en main, selon la nature du produit et les conditions du projet. Les documents nécessaires sont précisés avant la validation de la commande.'],
 ];
 
 export default function Home({ products, publicConfig }: { products: CatalogProduct[]; publicConfig: PublicConfig }) {
