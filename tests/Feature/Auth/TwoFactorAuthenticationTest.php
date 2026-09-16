@@ -21,18 +21,53 @@ class TwoFactorAuthenticationTest extends TestCase
             ->post("/admin/utilisateurs/{$admin->id}/double-authentification", ['current_password' => 'password'])
             ->assertRedirect();
 
+        $secret = session('two_factor_setup.secret');
         $admin->refresh();
-        $this->assertNotNull($admin->two_factor_secret);
+        $this->assertNotNull($secret);
+        $this->assertNull($admin->two_factor_secret);
         $this->assertNull($admin->two_factor_confirmed_at);
-        $this->assertNotSame($admin->two_factor_secret, $admin->getRawOriginal('two_factor_secret'));
 
-        $code = (new Google2FA)->getCurrentOtp($admin->two_factor_secret);
+        $code = (new Google2FA)->getCurrentOtp($secret);
         $this->post("/admin/utilisateurs/{$admin->id}/double-authentification/confirmer", ['code' => $code])
             ->assertRedirect();
 
         $admin->refresh();
         $this->assertTrue($admin->hasTwoFactorAuthentication());
+        $this->assertSame($secret, $admin->two_factor_secret);
+        $this->assertNotSame($admin->two_factor_secret, $admin->getRawOriginal('two_factor_secret'));
         $this->assertCount(8, $admin->two_factor_recovery_codes);
+    }
+
+    public function test_reconfiguration_keeps_the_current_authenticator_active_until_confirmation(): void
+    {
+        $google2fa = new Google2FA;
+        $currentSecret = $google2fa->generateSecretKey(32);
+        $superAdmin = User::factory()->create(['role' => 'super_admin']);
+        $admin = User::factory()->create([
+            'role' => 'assistant',
+            'two_factor_secret' => $currentSecret,
+            'two_factor_recovery_codes' => [],
+            'two_factor_confirmed_at' => now(),
+        ]);
+
+        $this->actingAs($superAdmin)
+            ->post("/admin/utilisateurs/{$admin->id}/double-authentification", ['current_password' => 'password'])
+            ->assertRedirect();
+
+        $pendingSecret = session('two_factor_setup.secret');
+        $admin->refresh();
+        $this->assertNotNull($pendingSecret);
+        $this->assertNotSame($currentSecret, $pendingSecret);
+        $this->assertSame($currentSecret, $admin->two_factor_secret);
+        $this->assertTrue($admin->hasTwoFactorAuthentication());
+
+        $this->post("/admin/utilisateurs/{$admin->id}/double-authentification/confirmer", [
+            'code' => $google2fa->getCurrentOtp($pendingSecret),
+        ])->assertRedirect();
+
+        $admin->refresh();
+        $this->assertSame($pendingSecret, $admin->two_factor_secret);
+        $this->assertTrue($admin->hasTwoFactorAuthentication());
     }
 
     public function test_two_factor_user_is_not_authenticated_until_the_totp_is_verified(): void
