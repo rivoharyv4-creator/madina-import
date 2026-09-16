@@ -5,9 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -28,19 +26,12 @@ class UserManagementController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $data = $this->validated($request);
-        $recoveryPhrase = Arr::pull($data, 'recovery_phrase');
-        $attributes = [
+        User::create([
             ...$data,
             'password' => Hash::make($data['password']),
             'email_verified_at' => now(),
             'permissions' => array_values(array_unique($data['permissions'] ?? [])),
-        ];
-
-        if (Schema::hasColumn('users', 'password_recovery_phrase')) {
-            $attributes['password_recovery_phrase'] = Hash::make($recoveryPhrase);
-        }
-
-        User::create($attributes);
+        ]);
 
         return back()->with('success', 'Utilisateur ajouté avec succès.');
     }
@@ -49,14 +40,10 @@ class UserManagementController extends Controller
     {
         abort_if($user->isSuperAdmin(), 403, 'Le compte super administrateur ne peut pas être modifié ici.');
         $data = $this->validated($request, $user);
-        $recoveryPhrase = Arr::pull($data, 'recovery_phrase');
         if (empty($data['password'])) {
             unset($data['password']);
         } else {
             $data['password'] = Hash::make($data['password']);
-        }
-        if (filled($recoveryPhrase) && Schema::hasColumn('users', 'password_recovery_phrase')) {
-            $data['password_recovery_phrase'] = Hash::make($recoveryPhrase);
         }
         $data['permissions'] = array_values(array_unique($data['permissions'] ?? []));
         $user->update($data);
@@ -71,7 +58,6 @@ class UserManagementController extends Controller
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user?->id)],
             'role' => ['required', Rule::in(['assistant', 'user'])],
             'password' => [$user ? 'nullable' : 'required', 'string', 'min:8'],
-            'recovery_phrase' => [$user ? 'nullable' : 'required', 'string', 'min:12', 'max:255'],
             'permissions' => ['required', 'array', 'min:1'],
             'permissions.*' => [Rule::in(array_keys(config('access.menus', [])))],
             'active' => ['required', 'boolean'],

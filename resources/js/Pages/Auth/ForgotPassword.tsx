@@ -26,7 +26,7 @@ export default function ForgotPassword({ loginUrl }: { loginUrl: string }) {
             <div className="mb-6">
                 <span className="mb-4 grid size-12 place-items-center rounded-xl bg-[#FCF108]/25 text-[#817900]"><ShieldCheck size={23}/></span>
                 <h1 className="text-2xl font-bold">Mot de passe oublié</h1>
-                <p className="mt-2 text-sm leading-6 text-gray-500">Utilisez la phrase secrète remise lors de la création de votre compte. Aucun e-mail ne sera envoyé.</p>
+                <p className="mt-2 text-sm leading-6 text-gray-500">Cette récupération est réservée au super-administrateur. Les autres comptes doivent contacter le super-administrateur.</p>
             </div>
 
             <form onSubmit={submit} className="space-y-4">

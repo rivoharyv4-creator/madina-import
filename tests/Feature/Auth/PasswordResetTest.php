@@ -57,6 +57,23 @@ class PasswordResetTest extends TestCase
         $this->assertTrue(Hash::check('password', $user->refresh()->password));
     }
 
+    public function test_non_super_admin_cannot_use_secret_phrase_password_recovery(): void
+    {
+        $assistant = User::factory()->create([
+            'role' => 'assistant',
+            'password_recovery_phrase' => Hash::make('ancienne phrase secrete'),
+        ]);
+
+        $this->post('/forgot-password', [
+            'email' => $assistant->email,
+            'secret_phrase' => 'ancienne phrase secrete',
+            'password' => 'NouveauMotDePasse2026',
+            'password_confirmation' => 'NouveauMotDePasse2026',
+        ])->assertSessionHasErrors('secret_phrase');
+
+        $this->assertTrue(Hash::check('password', $assistant->refresh()->password));
+    }
+
     public function test_legacy_email_reset_token_routes_are_disabled(): void
     {
         $this->get('/reset-password/ancien-token')->assertNotFound();

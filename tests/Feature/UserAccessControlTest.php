@@ -6,7 +6,6 @@ use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Schema;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -32,13 +31,13 @@ class UserAccessControlTest extends TestCase
 
         $this->actingAs($this->admin)->post('/admin/utilisateurs', [
             'name' => 'Assistante Test', 'email' => 'assistante@test.mg', 'role' => 'assistant', 'password' => 'MotDePasse2026',
-            'recovery_phrase' => 'phrase secrete assistante', 'permissions' => ['logistique', 'stock', 'catalogue'], 'active' => true,
+            'permissions' => ['logistique', 'stock', 'catalogue'], 'active' => true,
         ])->assertRedirect();
 
         $assistant = User::where('email', 'assistante@test.mg')->firstOrFail();
         $this->assertSame(['logistique', 'stock', 'catalogue'], $assistant->permissions);
         $this->assertTrue(Hash::check('MotDePasse2026', $assistant->password));
-        $this->assertTrue(Hash::check('phrase secrete assistante', $assistant->password_recovery_phrase));
+        $this->assertNull($assistant->password_recovery_phrase);
     }
 
     public function test_assistant_only_sees_and_opens_authorized_modules(): void
@@ -55,18 +54,13 @@ class UserAccessControlTest extends TestCase
         $this->actingAs($assistant)->get('/admin/utilisateurs')->assertForbidden();
     }
 
-    public function test_super_admin_can_create_a_user_when_the_optional_recovery_column_is_missing(): void
+    public function test_super_admin_can_create_a_user_without_a_recovery_phrase(): void
     {
-        Schema::table('users', function ($table) {
-            $table->dropColumn('password_recovery_phrase');
-        });
-
         $this->actingAs($this->admin)->post('/admin/utilisateurs', [
             'name' => 'Administrateur sans récupération',
             'email' => 'sans-recuperation@test.mg',
             'role' => 'assistant',
             'password' => 'MotDePasse2026',
-            'recovery_phrase' => 'phrase secrete temporaire',
             'permissions' => ['dashboard'],
             'active' => true,
         ])->assertRedirect()->assertSessionHasNoErrors();

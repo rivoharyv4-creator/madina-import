@@ -49,7 +49,11 @@ class PasswordResetLinkController extends Controller
             ]);
         }
 
-        $user = User::query()->where('email', $data['email'])->where('active', true)->first();
+        $user = User::query()
+            ->where('email', $data['email'])
+            ->where('role', 'super_admin')
+            ->where('active', true)
+            ->first();
         $dummyHash = '$2y$12$l8DBfSLOWwK7fslarVqPAOi7MKZX72r5sEK7f4I8oG2xO1AuxfQ.S';
         $valid = Hash::check($data['secret_phrase'], $user?->password_recovery_phrase ?? $dummyHash);
 
