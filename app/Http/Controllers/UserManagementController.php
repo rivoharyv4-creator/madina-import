@@ -7,6 +7,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -28,13 +29,18 @@ class UserManagementController extends Controller
     {
         $data = $this->validated($request);
         $recoveryPhrase = Arr::pull($data, 'recovery_phrase');
-        User::create([
+        $attributes = [
             ...$data,
             'password' => Hash::make($data['password']),
-            'password_recovery_phrase' => Hash::make($recoveryPhrase),
             'email_verified_at' => now(),
             'permissions' => array_values(array_unique($data['permissions'] ?? [])),
-        ]);
+        ];
+
+        if (Schema::hasColumn('users', 'password_recovery_phrase')) {
+            $attributes['password_recovery_phrase'] = Hash::make($recoveryPhrase);
+        }
+
+        User::create($attributes);
 
         return back()->with('success', 'Utilisateur ajouté avec succès.');
     }
@@ -49,7 +55,7 @@ class UserManagementController extends Controller
         } else {
             $data['password'] = Hash::make($data['password']);
         }
-        if (filled($recoveryPhrase)) {
+        if (filled($recoveryPhrase) && Schema::hasColumn('users', 'password_recovery_phrase')) {
             $data['password_recovery_phrase'] = Hash::make($recoveryPhrase);
         }
         $data['permissions'] = array_values(array_unique($data['permissions'] ?? []));

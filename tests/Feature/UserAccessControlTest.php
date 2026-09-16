@@ -6,6 +6,7 @@ use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -52,6 +53,28 @@ class UserAccessControlTest extends TestCase
         $this->actingAs($assistant)->get('/modules/commandes')->assertForbidden();
         $this->actingAs($assistant)->post('/modules/commandes', [])->assertForbidden();
         $this->actingAs($assistant)->get('/admin/utilisateurs')->assertForbidden();
+    }
+
+    public function test_super_admin_can_create_a_user_when_the_optional_recovery_column_is_missing(): void
+    {
+        Schema::table('users', function ($table) {
+            $table->dropColumn('password_recovery_phrase');
+        });
+
+        $this->actingAs($this->admin)->post('/admin/utilisateurs', [
+            'name' => 'Administrateur sans récupération',
+            'email' => 'sans-recuperation@test.mg',
+            'role' => 'assistant',
+            'password' => 'MotDePasse2026',
+            'recovery_phrase' => 'phrase secrete temporaire',
+            'permissions' => ['dashboard'],
+            'active' => true,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'sans-recuperation@test.mg',
+            'role' => 'assistant',
+        ]);
     }
 
     public function test_inactive_user_cannot_log_in(): void
