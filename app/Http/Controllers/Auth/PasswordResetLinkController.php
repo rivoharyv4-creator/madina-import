@@ -70,6 +70,6 @@ class PasswordResetLinkController extends Controller
         RateLimiter::clear($key);
         event(new PasswordReset($user));
 
-        return redirect()->route('login')->with('status', 'Mot de passe réinitialisé. Connectez-vous avec Google Authenticator.');
+        return redirect()->route('login')->with('status', 'Mot de passe réinitialisé. Vous pouvez maintenant vous connecter.');
     }
 }

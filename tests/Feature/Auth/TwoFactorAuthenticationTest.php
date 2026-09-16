@@ -82,7 +82,7 @@ class TwoFactorAuthenticationTest extends TestCase
         $this->post(route('login', absolute: false), [
             'email' => $user->email,
             'password' => 'password',
-        ])->assertSessionHasErrors(['code' => 'Le code Google Authenticator est obligatoire.']);
+        ])->assertSessionHasErrors(['code' => 'Le code Google Authenticator est obligatoire pour ce compte.']);
 
         $this->assertGuest();
     }
@@ -114,6 +114,34 @@ class TwoFactorAuthenticationTest extends TestCase
         $this->actingAs($assistant)
             ->get("/admin/utilisateurs/{$target->id}/double-authentification")
             ->assertForbidden();
+
+        $this->post("/admin/utilisateurs/{$target->id}/double-authentification", [
+            'current_password' => 'password',
+        ])->assertForbidden();
+
+        $this->delete("/admin/utilisateurs/{$target->id}/double-authentification", [
+            'current_password' => 'password',
+        ])->assertForbidden();
+    }
+
+    public function test_super_admin_can_disable_google_authenticator_for_an_admin(): void
+    {
+        $superAdmin = User::factory()->create(['role' => 'super_admin']);
+        $admin = User::factory()->create([
+            'role' => 'assistant',
+            'two_factor_secret' => (new Google2FA)->generateSecretKey(32),
+            'two_factor_recovery_codes' => [],
+            'two_factor_confirmed_at' => now(),
+        ]);
+
+        $this->actingAs($superAdmin)
+            ->delete("/admin/utilisateurs/{$admin->id}/double-authentification", [
+                'current_password' => 'password',
+            ])->assertRedirect(route('admin.users.index', absolute: false));
+
+        $admin->refresh();
+        $this->assertFalse($admin->hasTwoFactorAuthentication());
+        $this->assertNull($admin->two_factor_secret);
     }
 
     public function test_authentication_pages_send_security_headers(): void
@@ -160,16 +188,19 @@ class TwoFactorAuthenticationTest extends TestCase
         $this->assertSame([], $user->refresh()->two_factor_recovery_codes);
     }
 
-    public function test_unconfigured_assistant_cannot_log_in(): void
+    public function test_account_without_two_factor_can_log_in_with_a_password(): void
     {
-        $assistant = User::factory()->create(['role' => 'assistant']);
+        $assistant = User::factory()->create([
+            'role' => 'assistant',
+            'permissions' => ['dashboard'],
+        ]);
 
         $this->post(route('login', absolute: false), [
             'email' => $assistant->email,
             'password' => 'password',
-        ])->assertSessionHasErrors('code');
+        ])->assertRedirect(route('dashboard', absolute: false));
 
-        $this->assertGuest();
+        $this->assertAuthenticatedAs($assistant);
     }
 
     public function test_unconfigured_super_admin_can_access_the_back_office(): void

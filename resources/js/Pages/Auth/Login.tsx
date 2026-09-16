@@ -77,7 +77,7 @@ export default function Login({
                 </div>
 
                 <div className="mt-4">
-                    <InputLabel htmlFor="code" value="Google Authenticator" />
+                    <InputLabel htmlFor="code" value="Google Authenticator (si activé)" />
                     <div className="relative mt-1">
                         <Smartphone size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                         <TextInput
@@ -92,6 +92,7 @@ export default function Login({
                             onChange={(e) => setData('code', e.target.value)}
                         />
                     </div>
+                    <p className="mt-1 text-xs text-gray-400">Laissez ce champ vide si le super-administrateur n’a pas activé cette protection pour votre compte.</p>
                     {errors.code&&<p className="mt-2 text-xs text-red-600">{errors.code}</p>}
                 </div>
 
