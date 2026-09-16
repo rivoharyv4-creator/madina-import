@@ -1,8 +1,14 @@
 <?php
 
+use App\Http\Middleware\AddSecurityHeaders;
+use App\Http\Middleware\Authenticate;
+use App\Http\Middleware\EnsureModuleAccess;
+use App\Http\Middleware\EnsureSuperAdmin;
+use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -14,16 +20,15 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withCommands()
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'auth' => \App\Http\Middleware\Authenticate::class,
-            'super.admin' => \App\Http\Middleware\EnsureSuperAdmin::class,
-            'module.access' => \App\Http\Middleware\EnsureModuleAccess::class,
+            'auth' => Authenticate::class,
+            'super.admin' => EnsureSuperAdmin::class,
+            'module.access' => EnsureModuleAccess::class,
         ]);
 
         $middleware->web(append: [
-            \App\Http\Middleware\AddSecurityHeaders::class,
-            \App\Http\Middleware\RestrictTwoFactorEnrollment::class,
-            \App\Http\Middleware\HandleInertiaRequests::class,
-            \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
+            AddSecurityHeaders::class,
+            HandleInertiaRequests::class,
+            AddLinkHeadersForPreloadedAssets::class,
         ]);
 
         //

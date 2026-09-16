@@ -172,16 +172,17 @@ class TwoFactorAuthenticationTest extends TestCase
         $this->assertGuest();
     }
 
-    public function test_unconfigured_super_admin_is_restricted_to_own_enrollment_page(): void
+    public function test_unconfigured_super_admin_can_access_the_back_office(): void
     {
         $superAdmin = User::factory()->create(['role' => 'super_admin']);
 
         $this->post(route('login', absolute: false), [
             'email' => $superAdmin->email,
             'password' => 'password',
-        ])->assertRedirect(route('admin.users.two-factor.show', $superAdmin, false));
+        ])->assertRedirect(route('dashboard', absolute: false));
 
         $this->assertAuthenticatedAs($superAdmin);
-        $this->get('/dashboard')->assertRedirect(route('admin.users.two-factor.show', $superAdmin, false));
+        $this->get('/dashboard')->assertOk();
+        $this->get('/admin/utilisateurs')->assertOk();
     }
 }

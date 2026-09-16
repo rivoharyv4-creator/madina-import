@@ -39,9 +39,9 @@ class AuthenticatedSessionController extends Controller
         $user = $request->user();
         if (! $user->hasTwoFactorAuthentication()) {
             if ($user->isSuperAdmin()) {
-                $request->session()->put('two_factor_enrollment_only', true);
+                $request->session()->forget('two_factor_enrollment_only');
 
-                return redirect()->route('admin.users.two-factor.show', $user);
+                return redirect()->intended(route('dashboard', absolute: false));
             }
 
             Auth::guard('web')->logout();
