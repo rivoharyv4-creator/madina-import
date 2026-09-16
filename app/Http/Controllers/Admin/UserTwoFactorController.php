@@ -5,10 +5,13 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\TwoFactorAuthenticationService;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Inertia\Response;
+use Throwable;
 
 class UserTwoFactorController extends Controller
 {
@@ -74,13 +77,22 @@ class UserTwoFactorController extends Controller
             return back()->withErrors(['code' => 'Le code saisi est invalide ou expiré.']);
         }
 
-        $codes = $twoFactor->generateRecoveryCodes();
-        $user->forceFill([
-            'two_factor_secret' => $setup['secret'],
-            'two_factor_recovery_codes' => $twoFactor->hashRecoveryCodes($codes),
-            'two_factor_confirmed_at' => now(),
-            'two_factor_last_used_step' => null,
-        ])->save();
+        try {
+            $this->ensureTwoFactorColumnsExist();
+            $codes = $twoFactor->generateRecoveryCodes();
+            $user->forceFill([
+                'two_factor_secret' => $setup['secret'],
+                'two_factor_recovery_codes' => $twoFactor->hashRecoveryCodes($codes),
+                'two_factor_confirmed_at' => now(),
+                'two_factor_last_used_step' => null,
+            ])->save();
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return back()->withErrors([
+                'code' => 'La configuration n’a pas pu être enregistrée. Réessayez après le déploiement de la base de données.',
+            ]);
+        }
 
         $request->session()->forget('two_factor_setup');
         if ($request->user()->is($user)) {
@@ -98,14 +110,39 @@ class UserTwoFactorController extends Controller
             'current_password' => ['required', 'current_password:web'],
         ]);
 
-        $user->forceFill([
-            'two_factor_secret' => null,
-            'two_factor_recovery_codes' => null,
-            'two_factor_confirmed_at' => null,
-            'two_factor_last_used_step' => null,
-        ])->save();
+        try {
+            $this->ensureTwoFactorColumnsExist();
+            $user->forceFill([
+                'two_factor_secret' => null,
+                'two_factor_recovery_codes' => null,
+                'two_factor_confirmed_at' => null,
+                'two_factor_last_used_step' => null,
+            ])->save();
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return back()->withErrors([
+                'current_password' => 'La modification n’a pas pu être enregistrée. Réessayez après le déploiement de la base de données.',
+            ]);
+        }
         $request->session()->forget('two_factor_setup');
 
         return redirect()->route('admin.users.index')->with('success', 'Double authentification désactivée.');
+    }
+
+    private function ensureTwoFactorColumnsExist(): void
+    {
+        $columns = [
+            'two_factor_secret' => fn (Blueprint $table) => $table->text('two_factor_secret')->nullable(),
+            'two_factor_recovery_codes' => fn (Blueprint $table) => $table->text('two_factor_recovery_codes')->nullable(),
+            'two_factor_confirmed_at' => fn (Blueprint $table) => $table->timestamp('two_factor_confirmed_at')->nullable(),
+            'two_factor_last_used_step' => fn (Blueprint $table) => $table->unsignedBigInteger('two_factor_last_used_step')->nullable(),
+        ];
+
+        foreach ($columns as $column => $definition) {
+            if (! Schema::hasColumn('users', $column)) {
+                Schema::table('users', $definition);
+            }
+        }
     }
 }

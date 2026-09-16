@@ -5,6 +5,7 @@ namespace Tests\Feature\Auth;
 use App\Models\User;
 use App\Services\TwoFactorAuthenticationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use PragmaRX\Google2FA\Google2FA;
 use Tests\TestCase;
 
@@ -68,6 +69,32 @@ class TwoFactorAuthenticationTest extends TestCase
         $admin->refresh();
         $this->assertSame($pendingSecret, $admin->two_factor_secret);
         $this->assertTrue($admin->hasTwoFactorAuthentication());
+    }
+
+    public function test_confirmation_repairs_missing_two_factor_columns(): void
+    {
+        $superAdmin = User::factory()->create(['role' => 'super_admin']);
+        $admin = User::factory()->create(['role' => 'assistant']);
+
+        $this->actingAs($superAdmin)
+            ->post("/admin/utilisateurs/{$admin->id}/double-authentification", ['current_password' => 'password'])
+            ->assertRedirect();
+
+        $secret = session('two_factor_setup.secret');
+        Schema::table('users', function ($table) {
+            $table->dropColumn([
+                'two_factor_secret',
+                'two_factor_recovery_codes',
+                'two_factor_confirmed_at',
+                'two_factor_last_used_step',
+            ]);
+        });
+
+        $this->post("/admin/utilisateurs/{$admin->id}/double-authentification/confirmer", [
+            'code' => (new Google2FA)->getCurrentOtp($secret),
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertTrue($admin->refresh()->hasTwoFactorAuthentication());
     }
 
     public function test_two_factor_user_is_not_authenticated_until_the_totp_is_verified(): void
