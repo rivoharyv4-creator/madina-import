@@ -3,6 +3,7 @@
 use Database\Seeders\TestCatalogueSeeder;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\Schema;
 
@@ -11,6 +12,25 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('madina:backup')->dailyAt('02:00')->withoutOverlapping();
+
+Artisan::command('madina:disable-two-factor {email} {--force : Confirm disabling authentication for this staff account}', function () {
+    if (! $this->option('force')) {
+        $this->error('Specify --force to confirm disabling Google Authenticator for this account.');
+
+        return 1;
+    }
+    $email = mb_strtolower(trim($this->argument('email')));
+    $query = DB::table('users')->where('email', $email)->whereIn('role', ['super_admin', 'admin', 'assistant', 'user']);
+    if (! $query->exists()) {
+        $this->error('Staff account not found.');
+
+        return 1;
+    }
+    $query->update(['two_factor_secret' => null, 'two_factor_recovery_codes' => null, 'two_factor_confirmed_at' => null, 'two_factor_last_used_step' => null, 'updated_at' => now()]);
+    $this->info('Google Authenticator disabled for this staff account. Password unchanged.');
+
+    return 0;
+})->purpose('Reset Google Authenticator for one explicitly selected back-office account');
 
 Artisan::command('madina:test-catalogue {--force : Allow migrations and test products in production}', function () {
     $options = ['--force' => (bool) $this->option('force')];

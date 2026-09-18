@@ -5,6 +5,7 @@ namespace Tests\Feature\Auth;
 use App\Models\User;
 use App\Services\TwoFactorAuthenticationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use PragmaRX\Google2FA\Google2FA;
 use Tests\TestCase;
@@ -12,6 +13,30 @@ use Tests\TestCase;
 class TwoFactorAuthenticationTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_authenticator_is_inactive_by_default_and_unconfirmed_old_secret_does_not_break_login(): void
+    {
+        $user = User::factory()->create();
+        $this->assertFalse($user->hasTwoFactorAuthentication());
+        DB::table('users')->where('id', $user->id)->update(['two_factor_secret' => 'unreadable-old-ciphertext']);
+        $this->assertFalse($user->refresh()->hasTwoFactorAuthentication());
+        $this->post(route('login'), ['email' => $user->email, 'password' => 'password'])->assertRedirect(route('dashboard', absolute: false));
+        $this->assertAuthenticatedAs($user);
+    }
+
+    public function test_cloud_reset_disables_only_selected_staff_account_without_decrypting_secret(): void
+    {
+        $user = User::factory()->create();
+        $other = User::factory()->create();
+        DB::table('users')->whereIn('id', [$user->id, $other->id])->update(['two_factor_secret' => 'unreadable-old-ciphertext', 'two_factor_confirmed_at' => now()]);
+        $password = $user->password;
+        $this->artisan('madina:disable-two-factor', ['email' => $user->email, '--force' => true])->assertExitCode(0);
+        $this->assertFalse($user->refresh()->hasTwoFactorAuthentication());
+        $this->assertSame($password, $user->password);
+        $this->assertTrue($other->refresh()->hasTwoFactorAuthentication());
+        $customer = User::factory()->create(['role' => 'customer']);
+        $this->artisan('madina:disable-two-factor', ['email' => $customer->email, '--force' => true])->assertExitCode(1);
+    }
 
     public function test_missing_user_setup_returns_super_admin_to_the_user_list(): void
     {

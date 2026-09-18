@@ -44,7 +44,8 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function hasTwoFactorAuthentication(): bool
     {
-        return filled($this->two_factor_secret) && $this->two_factor_confirmed_at !== null;
+        // Checking enrollment must not decrypt an old secret after an APP_KEY change.
+        return $this->two_factor_confirmed_at !== null && filled($this->getRawOriginal('two_factor_secret'));
     }
 
     public function canAccessModule(string $module): bool
