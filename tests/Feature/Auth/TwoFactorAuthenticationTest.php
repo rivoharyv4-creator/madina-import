@@ -13,6 +13,15 @@ class TwoFactorAuthenticationTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_missing_user_setup_returns_super_admin_to_the_user_list(): void
+    {
+        $superAdmin = User::factory()->create(['role' => 'super_admin']);
+        $this->actingAs($superAdmin)
+            ->get('/admin/utilisateurs/999999/double-authentification')
+            ->assertRedirect(route('admin.users.index'))
+            ->assertSessionHas('missing_user');
+    }
+
     public function test_super_admin_can_configure_google_authenticator_for_an_admin(): void
     {
         $superAdmin = User::factory()->create(['role' => 'super_admin']);
@@ -109,9 +118,14 @@ class TwoFactorAuthenticationTest extends TestCase
         $this->post(route('login', absolute: false), [
             'email' => $user->email,
             'password' => 'password',
-        ])->assertSessionHasErrors(['code' => 'Le code Google Authenticator est obligatoire pour ce compte.']);
+        ])->assertRedirect(route('two-factor.challenge'));
 
         $this->assertGuest();
+        $this->get(route('two-factor.challenge'))->assertOk();
+        $this->post(route('two-factor.login'), [
+            'code' => (new Google2FA)->getCurrentOtp($secret),
+        ])->assertRedirect(route('dashboard', absolute: false));
+        $this->assertAuthenticatedAs($user);
     }
 
     public function test_two_factor_code_can_be_submitted_with_email_and_password(): void

@@ -126,9 +126,12 @@ class PublicSiteController extends Controller
 
     private function catalogProduct(object $product): array
     {
-        $stock=(float)$product->quantity;
-        $threshold=(float)($product->alert_threshold??0);
-        return ['slug'=>$product->slug,'reference'=>$product->reference,'name'=>$product->name,'category'=>$product->category,'short_description'=>$product->short_description,'availability'=>$stock<=0?'Indisponible':($threshold>0&&$stock<=$threshold?'Stock limité':'Disponible'),'price'=>$product->show_price?(float)$product->sale_price:null,'image_url'=>$product->photo_path?route('public.catalog.image',[$product->slug,0]):$this->catalogMockup($product->reference)];
+        $availability=match($product->public_availability_status??'available_now'){
+            'out_of_stock'=>'Rupture',
+            'on_order'=>'Sur commande',
+            default=>'Disponible de suite',
+        };
+        return ['id'=>$product->id,'slug'=>$product->slug,'reference'=>$product->reference,'name'=>$product->name,'category'=>$product->category,'short_description'=>$product->short_description,'availability'=>$availability,'price'=>$product->show_price?(float)$product->sale_price:null,'image_url'=>$product->photo_path?route('public.catalog.image',[$product->slug,0]):$this->catalogMockup($product->reference)];
     }
 
     private function catalogMockup(?string $reference): ?string

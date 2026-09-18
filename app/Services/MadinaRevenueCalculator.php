@@ -19,7 +19,7 @@ final class MadinaRevenueCalculator
      */
     public function between(CarbonInterface $start, CarbonInterface $end): float
     {
-        return $this->fromInvoices(
+        $invoiced = $this->fromInvoices(
             DB::table('invoices')
                 ->whereNull('deleted_at')
                 ->where('status', '!=', 'annulee')
@@ -27,6 +27,28 @@ final class MadinaRevenueCalculator
                 ->select('order_id', 'subtotal')
                 ->get()
         );
+        $webOrders = DB::table('orders')->whereNull('deleted_at')->whereNotNull('user_id')
+            ->where('payment_status', 'confirmed')->whereIn('status', ['confirmed', 'processing', 'completed'])
+            ->whereBetween('payment_confirmed_at', [$start->copy()->startOfDay(), $end->copy()->endOfDay()])
+            ->whereNotIn('id', DB::table('invoices')->whereNull('deleted_at')->where('status', '!=', 'annulee')->select('order_id'))
+            ->get(['id', 'client_total']);
+        $costs = $this->webPurchaseCosts($webOrders->pluck('id'));
+
+        return $invoiced + (float) $webOrders->sum(fn ($order) => (float) $order->client_total - (float) ($costs[$order->id] ?? 0));
+    }
+
+    private function webPurchaseCosts(Collection $orderIds): Collection
+    {
+        $freight = DB::table('orders')->whereIn('id', $orderIds)->pluck('freight', 'id');
+        $expenses = DB::table('expenses')->whereIn('order_id', $orderIds)->where('type', 'business')
+            ->select('order_id', DB::raw('SUM(amount) as total'))->groupBy('order_id')->pluck('total', 'order_id');
+
+        return DB::table('order_items')->whereIn('order_id', $orderIds)
+            ->select('order_id', DB::raw('SUM((COALESCE(web_purchase_price, supplier_price) + china_delivery + packaging) * quantity) as total'), DB::raw('SUM(freight) as item_freight'))
+            ->groupBy('order_id')->get()->mapWithKeys(fn ($row) => [$row->order_id => (float) $row->total
+                + ((float) ($freight[$row->order_id] ?? 0) > 0 ? (float) $freight[$row->order_id] : (float) $row->item_freight)
+                + (float) ($expenses[$row->order_id] ?? 0),
+            ]);
     }
 
     /**
@@ -73,8 +95,9 @@ final class MadinaRevenueCalculator
         $orders = DB::table('orders')
             ->whereNull('deleted_at')
             ->whereIn('id', $orderIds)
-            ->get(['id', 'supplier_total', 'freight'])
+            ->get(['id', 'supplier_total', 'freight', 'user_id', 'payment_status', 'status'])
             ->keyBy('id');
+        $webCosts = $this->webPurchaseCosts($orders->filter(fn ($order) => $order->user_id !== null)->keys());
 
         $otherDirectCosts = DB::table('expenses')
             ->whereIn('order_id', $orderIds)
@@ -88,7 +111,7 @@ final class MadinaRevenueCalculator
             ->groupBy('order_id')
             ->pluck('total', 'order_id');
 
-        return (float) $invoicedByOrder->sum(function (float $invoiced, int|string $orderId) use ($totalInvoicedByOrder, $orders, $otherDirectCosts, $itemDirectCosts) {
+        return (float) $invoicedByOrder->sum(function (float $invoiced, int|string $orderId) use ($totalInvoicedByOrder, $orders, $otherDirectCosts, $itemDirectCosts, $webCosts) {
             $order = $orders->get($orderId);
             if (! $order) {
                 return $invoiced;
@@ -96,6 +119,13 @@ final class MadinaRevenueCalculator
 
             $totalInvoiced = (float) ($totalInvoicedByOrder[$orderId] ?? 0);
             $share = $totalInvoiced > 0 ? $invoiced / $totalInvoiced : 0;
+            if ($order->user_id !== null) {
+                if ($order->payment_status !== 'confirmed' || ! in_array($order->status, ['confirmed', 'processing', 'completed'])) {
+                    return 0.0;
+                }
+
+                return $invoiced - (float) ($webCosts[$orderId] ?? 0) * $share;
+            }
             $directCosts = (float) $order->supplier_total
                 + (float) $order->freight
                 + (float) ($itemDirectCosts[$orderId] ?? 0)

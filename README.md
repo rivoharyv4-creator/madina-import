@@ -37,6 +37,8 @@ La base incluse est destinée aux tests client. Avant une mise en production, re
 
 ### Laravel Cloud et conservation des données
 
+Les trois produits de test du catalogue (Chaise, Table et Tapis), leurs photos et leurs disponibilités sont conservés dans `database/fixtures/catalogue`. Pour les ajouter explicitement sur un environnement de test après migration : `php artisan db:seed --class=TestCatalogueSeeder`. Ce seeder conserve les produits existants et ne crée aucun compte ni donnée de paiement. Il ne fait pas partie du seeding ou du déploiement automatique.
+
 SQLite peut être utilisé sur un environnement Cloud temporaire de démonstration avec la base versionnée. Définir `DB_CONNECTION=sqlite`; sans `SQLITE_DATABASE`, l'application utilise automatiquement `database/database.sqlite`. Les anciennes variables MySQL `DB_DATABASE` et `DB_URL` sont ignorées par cette connexion SQLite. Le système de fichiers des instances Laravel Cloud reste toutefois éphémère : les écritures effectuées après le déploiement ne sont pas garanties lors d'un redémarrage ou d'un redéploiement. Pour une production durable, attacher une base Laravel MySQL ou Serverless Postgres à l'environnement. Laravel Cloud injectera alors les variables `DB_*` nécessaires.
 
 La commande de déploiement doit utiliser uniquement `php artisan migrate --force`. Ne jamais exécuter `migrate:fresh`, `db:wipe` ou `db:seed` automatiquement en production. Les migrations normales conservent les enregistrements existants. Les fichiers téléversés doivent être placés dans Laravel Object Storage plutôt que sur le disque local de l’instance.
@@ -56,5 +58,7 @@ L’accès à la connexion de gestion n’est pas affiché sur le site public. D
 La production doit utiliser HTTPS avec `APP_ENV=production`, `APP_DEBUG=false`, `SESSION_SECURE_COOKIE=true`, `SESSION_HTTP_ONLY=true` et `SESSION_SAME_SITE=lax`.
 
 ## Tests
+
+Le parcours de panier invité, compte vérifié et paiement manuel est documenté dans [docs/customer-checkout.md](docs/customer-checkout.md), avec les routes, la migration, la configuration Resend et les limites de validation.
 
 `php artisan test`. Sous Windows, si `pdo_sqlite` n’est pas activé globalement : `php -d extension=pdo_sqlite vendor/bin/phpunit`.

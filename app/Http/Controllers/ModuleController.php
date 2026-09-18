@@ -39,7 +39,7 @@ class ModuleController extends Controller
             'achats' => ['title' => 'Achats fournisseurs', 'table' => 'supplier_payments', 'primary' => 'Nouveau paiement', 'editable' => true, 'columns' => ['supplier_id' => 'Fournisseur', 'paid_at' => 'Date', 'quantity' => 'Quantité', 'unit_price' => 'Prix unitaire', 'amount' => 'Montant total payé', 'method' => 'Mode', 'proof_path' => 'Justificatif', 'status' => 'Statut']],
             'logistique' => ['title' => 'Suivi Logistique', 'table' => 'shipments', 'primary' => 'Nouveau suivi logistique', 'editable' => true, 'columns' => ['order_id' => 'N° commande', 'tracking' => 'Tracking number', 'forwarder' => 'Transitaire', 'container_reference' => 'Référence conteneur', 'expected_madagascar_at' => 'Arrivage prévu', 'cbm' => 'CBM / volume', 'package_count' => 'Colis', 'carton_count' => 'Cartons', 'cost' => 'Frais de fret', 'status' => 'Statut']],
             'stock' => ['title' => 'Stock', 'table' => 'inventory_products', 'primary' => 'Ajouter un produit', 'editable' => true, 'columns' => ['photo_path' => 'Photo', 'reference' => 'SKU', 'name' => 'Produit', 'quantity' => 'Stock', 'reserved_quantity' => 'Réservée', 'available_quantity' => 'Disponible', 'total_purchase_cost' => 'Coût total', 'sale_total' => 'Valeur de vente']],
-            'catalogue' => ['title' => 'Catalogue', 'table' => 'inventory_products', 'primary' => null, 'editable' => true, 'columns' => ['photo_path' => 'Photo', 'reference' => 'SKU', 'name' => 'Produit', 'category' => 'Catégorie', 'is_published' => 'Publication', 'is_featured' => 'Mise en avant', 'show_price' => 'Prix visible']],
+            'catalogue' => ['title' => 'Catalogue', 'table' => 'inventory_products', 'primary' => null, 'editable' => true, 'columns' => ['photo_path' => 'Photo', 'reference' => 'SKU', 'name' => 'Produit', 'category' => 'Catégorie', 'public_availability_status' => 'Disponibilité publique', 'is_published' => 'Publication', 'is_featured' => 'Mise en avant', 'show_price' => 'Prix visible']],
             'demandes' => ['title' => 'Demandes publiques', 'table' => 'contact_requests', 'primary' => null, 'editable' => false, 'viewable' => true, 'columns' => ['name' => 'Nom', 'contact' => 'Contact', 'need' => 'Besoin', 'message' => 'Message', 'status' => 'Statut', 'created_at' => 'Reçue le']],
             'depenses' => ['title' => 'Dépenses', 'table' => 'expenses', 'primary' => 'Nouvelle dépense', 'editable' => true, 'columns' => ['spent_at' => 'Date', 'category' => 'Catégorie', 'description' => 'Description', 'type' => 'Type', 'amount' => 'Montant']],
             'salaires' => ['title' => 'Salaires et IRSA', 'table' => 'salaries', 'primary' => 'Préparer un salaire', 'editable' => true, 'related_action' => ['label' => 'Gérer les employés', 'href' => '/modules/employes'], 'columns' => ['employee_id' => 'Employé', 'month' => 'Mois', 'gross_salary' => 'Brut', 'irsa_amount' => 'IRSA', 'net_salary' => 'Net']],
@@ -95,6 +95,9 @@ class ModuleController extends Controller
 
     public function edit(string $module, int $id)
     {
+        if ($module === 'commandes' && DB::table('orders')->where('id',$id)->whereNotNull('user_id')->exists()) {
+            return redirect()->route('admin.manual-payments')->with('success','Les commandes web sont gérées depuis les paiements manuels.');
+        }
         $config = $this->config($module);
         abort_unless($config['editable'] ?? false, 404);
         $query = DB::table($config['table']);
@@ -269,6 +272,9 @@ class ModuleController extends Controller
 
     public function update(StoreModuleRequest $request, string $module, int $id, BusinessCalculator $calculator, MadinaRevenueCalculator $revenueCalculator)
     {
+        if ($module === 'commandes' && DB::table('orders')->where('id',$id)->whereNotNull('user_id')->exists()) {
+            throw ValidationException::withMessages(['status'=>'Utilisez la gestion des paiements manuels pour traiter une commande web.']);
+        }
         $config = $this->config($module);
         abort_unless($config['editable'] ?? false, 404);
         $query = DB::table($config['table']);
@@ -561,7 +567,7 @@ class ModuleController extends Controller
             })->values()->all()
             : [['label' => 'Frais de commande', 'quantity' => 1, 'unit_price' => $subtotal, 'amount' => $subtotal]];
 
-        return DB::table('invoices')->insertGetId(['number' => $numbers->next($data['type'] === 'frais' ? 'fee_invoice' : 'invoice'), 'order_id' => $order->id, 'client_id' => $order->client_id, 'type' => $data['type'], 'status' => $paid > 0 && $paid < $subtotal ? 'partielle' : $data['status'], 'issued_at' => $data['issued_at'], 'subtotal' => $subtotal, 'paid_amount' => $paid, 'balance_due' => $subtotal - $paid, 'lines' => json_encode($lines), 'created_at' => now(), 'updated_at' => now()]);
+        return DB::table('invoices')->insertGetId(['shipping_delay' => $data['shipping_delay'] ?? null, 'bank_details' => $data['bank_details'] ?? null, 'payment_terms' => $data['payment_terms'] ?? null, 'warranty' => $data['warranty'] ?? null, 'notes' => $data['notes'] ?? null, 'number' => $numbers->next($data['type'] === 'frais' ? 'fee_invoice' : 'invoice'), 'order_id' => $order->id, 'client_id' => $order->client_id, 'type' => $data['type'], 'status' => $paid > 0 && $paid < $subtotal ? 'partielle' : $data['status'], 'issued_at' => $data['issued_at'], 'subtotal' => $subtotal, 'paid_amount' => $paid, 'balance_due' => $subtotal - $paid, 'lines' => json_encode($lines), 'created_at' => now(), 'updated_at' => now()]);
     }
 
     private function createSupplierPayment(array $data): int
@@ -740,7 +746,7 @@ class ModuleController extends Controller
             $paid = (float) ($data['paid_amount'] ?? 0);
             if ($paid > $subtotal) {
                 throw ValidationException::withMessages(['paid_amount' => 'Le montant reçu ne peut pas dépasser le total.']);
-            } DB::table('invoices')->where('id', $id)->update(['order_id' => $order->id, 'client_id' => $order->client_id, 'type' => $data['type'], 'issued_at' => $data['issued_at'], 'subtotal' => $subtotal, 'paid_amount' => $paid, 'balance_due' => $subtotal - $paid, 'status' => $paid >= $subtotal ? 'payee' : ($paid > 0 ? 'partielle' : $data['status']), 'lines' => json_encode([['label' => $data['type'] === 'frais' ? 'Frais de commande' : 'Produits commandés', 'amount' => $subtotal]]), 'updated_at' => now()]);
+            } DB::table('invoices')->where('id', $id)->update(['shipping_delay' => $data['shipping_delay'] ?? null, 'bank_details' => $data['bank_details'] ?? null, 'payment_terms' => $data['payment_terms'] ?? null, 'warranty' => $data['warranty'] ?? null, 'notes' => $data['notes'] ?? null, 'order_id' => $order->id, 'client_id' => $order->client_id, 'type' => $data['type'], 'issued_at' => $data['issued_at'], 'subtotal' => $subtotal, 'paid_amount' => $paid, 'balance_due' => $subtotal - $paid, 'status' => $paid >= $subtotal ? 'payee' : ($paid > 0 ? 'partielle' : $data['status']), 'lines' => json_encode([['label' => $data['type'] === 'frais' ? 'Frais de commande' : 'Produits commandés', 'amount' => $subtotal]]), 'updated_at' => now()]);
 
             return;
         }
@@ -1059,6 +1065,11 @@ class ModuleController extends Controller
                 $input('category', 'Catégorie catalogue', 'text', false),
                 $input('short_description', 'Description courte', 'textarea', false),
                 $input('catalog_description', 'Description catalogue', 'textarea', false),
+                $select('public_availability_status', 'Disponibilité affichée au public', [
+                    ['value' => 'out_of_stock', 'label' => 'Rupture'],
+                    ['value' => 'available_now', 'label' => 'Disponible de suite'],
+                    ['value' => 'on_order', 'label' => 'Sur commande'],
+                ], true, 'available_now'),
                 $select('is_published', 'Publication catalogue', [['value' => 0, 'label' => 'Non publié'], ['value' => 1, 'label' => 'Publié']], true, 0),
                 $select('is_featured', 'Mise en avant sur l’accueil', [['value' => 0, 'label' => 'Non'], ['value' => 1, 'label' => 'Oui']], true, 0),
                 $select('show_price', 'Afficher le prix de vente', [['value' => 0, 'label' => 'Masquer le prix'], ['value' => 1, 'label' => 'Afficher le prix']], true, 0),
@@ -1066,7 +1077,7 @@ class ModuleController extends Controller
             'devis' => [$select('client_id', 'Client enregistré (optionnel)', $clients, false), $input('client_name', 'Nom du client'), $input('client_contact', 'Contact du client'), $select('client_type', 'Type de client', $o(['revendeur', 'entrepreneur', 'particulier', 'hotel']), true, 'particulier'), $input('valid_until', 'Valide jusqu’au', 'date'), $select('shipping_mode', 'Mode d’envoi', [['value' => 'maritime', 'label' => 'Maritime'], ['value' => 'aerien', 'label' => 'Aérien']]), $input('shipping_delay', 'Délai d’expédition', 'text', false), $select('status', 'Statut', [['value' => 'brouillon', 'label' => 'Brouillon'], ['value' => 'envoye', 'label' => 'Envoyé'], ['value' => 'negociation', 'label' => 'Négociation'], ['value' => 'accepte', 'label' => 'Accepté'], ['value' => 'refuse', 'label' => 'Refusé'], ['value' => 'sans_reponse', 'label' => 'Sans réponse'], ['value' => 'relance_1', 'label' => 'Relance 1'], ['value' => 'relance_2', 'label' => 'Relance 2']], true, 'brouillon'), $input('bank_details', 'Informations bancaires / compte bancaire', 'textarea', false), $input('payment_terms', 'Conditions de paiement', 'textarea', false), $input('warranty', 'Garantie', 'textarea', false), $input('notes', 'Note / remarque', 'textarea', false)],
             'commandes' => [$select('quote_id', 'Créer à partir du devis n°', $quotes, false), $select('client_id', 'Client', $clients), $select('commission_enabled', 'Appliquer une commission', [['value' => 0, 'label' => 'Non'], ['value' => 1, 'label' => 'Oui']], true, 0), $input('commission_rate', 'Taux commission (%)', 'number', false, 8), $input('deposit', 'Acompte reçu (Ar)', 'number', false, 0), $input('ordered_at', 'Date de commande', 'date', true, $today), $select('shipping_mode', 'Mode d’envoi', $o(['aerien', 'maritime']), false), $select('status', 'Statut', [['value' => 'brouillon', 'label' => 'Brouillon'], ['value' => 'demande_recue', 'label' => 'Demande reçue'], ['value' => 'attente_validation', 'label' => 'Attente validation'], ['value' => 'confirmee', 'label' => 'Confirmée'], ['value' => 'acompte_recu', 'label' => 'Acompte reçu'], ['value' => 'achat_lance', 'label' => 'Achat lancé'], ['value' => 'achat_effectue', 'label' => 'Achat effectué']], true, 'brouillon'), $input('notes', 'Notes internes', 'textarea', false)],
             'paiements' => [$select('client_id', 'Client', $clients), $select('order_id', 'Commande à créditer (optionnelle)', $orders, false), $select('invoice_id', 'Facture à créditer (optionnelle)', $invoices, false), $input('paid_at', 'Date', 'date', true, $today), $input('amount', 'Montant reçu (Ar)', 'number'), $input('allocated_amount', 'Montant affecté (Ar)', 'number', false, 0), $select('method', 'Mode de paiement', $o(['Mobile Money', 'Virement bancaire', 'Espèces', 'Chèque'])), $input('reference', 'Référence', 'text', false), $select('type', 'Motif du paiement', [['value' => 'acompte_commande', 'label' => 'Acompte de commande'], ['value' => 'solde_commande', 'label' => 'Solde de commande'], ['value' => 'fournisseur_chine', 'label' => 'Paiement fournisseur en Chine'], ['value' => 'fret_transport', 'label' => 'Frais de fret / transport'], ['value' => 'frais_service', 'label' => 'Frais de service'], ['value' => 'autre', 'label' => 'Autre']]), $input('payment_object', 'Objet du paiement', 'text'), $input('notes', 'Précision / notes (obligatoire si Autre)', 'textarea', false)],
-            'factures' => [$select('order_id', 'Commande', $orders), $select('type', 'Type de facture', $o(['produits', 'frais'])), $input('issued_at', 'Date', 'date', true, $today), $input('subtotal', 'Total (Ar)', 'number'), $input('paid_amount', 'Montant déjà reçu (Ar)', 'number', false, 0), $select('status', 'Statut', $o(['brouillon', 'provisoire', 'finale', 'payee', 'partielle']), true, 'brouillon')],
+            'factures' => [$select('order_id', 'Commande', $orders), $select('type', 'Type de facture', $o(['produits', 'frais'])), $input('issued_at', 'Date', 'date', true, $today), $input('subtotal', 'Total (Ar)', 'number'), $input('paid_amount', 'Montant déjà reçu (Ar)', 'number', false, 0), $select('status', 'Statut', $o(['brouillon', 'provisoire', 'finale', 'payee', 'partielle']), true, 'brouillon'), $input('shipping_delay', 'Délai d’expédition', 'text', false), $input('bank_details', 'Informations bancaires / compte bancaire', 'textarea', false), $input('payment_terms', 'Conditions de paiement', 'textarea', false), $input('warranty', 'Garantie', 'textarea', false), $input('notes', 'Note / remarque', 'textarea', false)],
             'achats' => [$select('supplier_id', 'Fournisseur', $suppliers), $select('order_id', 'Commande concernée', $orders), $input('paid_at', 'Date', 'date', true, $today), $input('quantity', 'Quantité', 'number'), $input('unit_price', 'Prix unitaire (Ar)', 'number'), $input('amount', 'Montant total payé (Ar)', 'number') + ['readOnly' => true, 'money' => true], $select('method', 'Mode', $o(['WeChat', 'Alipay', 'banque'])), $input('reference', 'Référence', 'text', false), $input('proof', 'Justificatif — capture (optionnelle)', 'file', false), $input('proof_url', 'Justificatif — lien (optionnel)', 'url', false), $select('status', 'Statut du paiement', $o(['paye', 'partiel', 'en_attente'])), $input('notes', 'Notes de suivi', 'textarea', false)],
             'logistique' => [
                 $select('order_id', 'Numéro de commande', $orders) + ['section' => '1. Liaison'],
@@ -1318,6 +1329,14 @@ class ModuleController extends Controller
     {
         $table = $config['table'];
         $query = DB::table($table)->orderByDesc($table.'.id');
+        if ($table === 'orders') {
+            $query->where(function ($orders) {
+                $orders->whereNull('orders.user_id')->orWhere(function ($webOrders) {
+                    $webOrders->where('orders.payment_status', 'confirmed')
+                        ->whereIn('orders.status', ['confirmed', 'processing', 'completed']);
+                });
+            });
+        }
         if (DB::getSchemaBuilder()->hasColumn($table, 'deleted_at')) {
             $query->whereNull($table.'.deleted_at');
         }
@@ -1398,7 +1417,7 @@ class ModuleController extends Controller
             'employes' => ['active' => 'Statut'],
             'fiscalite' => ['type' => 'Type', 'status' => 'Statut'],
             'stock' => ['is_published' => 'Catalogue', 'category' => 'Catégorie'],
-            'catalogue' => ['is_published' => 'Publication', 'is_featured' => 'Mise en avant', 'category' => 'Catégorie'],
+            'catalogue' => ['is_published' => 'Publication', 'public_availability_status' => 'Disponibilité', 'is_featured' => 'Mise en avant', 'category' => 'Catégorie'],
             'demandes' => ['status' => 'Statut', 'client_type' => 'Profil'],
             'rapports' => ['event' => 'Opération'],
             default => [],
@@ -1407,6 +1426,14 @@ class ModuleController extends Controller
 
     private function filterValueLabel(string $module, string $field, mixed $value): string
     {
+        if ($field === 'public_availability_status') {
+            return match ($value) {
+                'out_of_stock' => 'Rupture',
+                'available_now' => 'Disponible de suite',
+                'on_order' => 'Sur commande',
+                default => (string) $value,
+            };
+        }
         if ($field === 'active') {
             return (bool) $value ? 'Actif' : 'Inactif';
         }

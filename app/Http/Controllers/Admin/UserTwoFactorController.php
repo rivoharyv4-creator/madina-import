@@ -17,6 +17,7 @@ class UserTwoFactorController extends Controller
 {
     public function show(Request $request, User $user, TwoFactorAuthenticationService $twoFactor): Response
     {
+        abort_if($user->role === 'customer', 403);
         $setup = null;
         $pendingSetup = $request->session()->get('two_factor_setup');
         if ((int) ($pendingSetup['user_id'] ?? 0) === $user->id
@@ -44,6 +45,7 @@ class UserTwoFactorController extends Controller
 
     public function setup(Request $request, User $user, TwoFactorAuthenticationService $twoFactor): RedirectResponse
     {
+        abort_if($user->role === 'customer', 403);
         $request->validate([
             'current_password' => ['required', 'current_password:web'],
         ]);
@@ -59,6 +61,7 @@ class UserTwoFactorController extends Controller
 
     public function confirm(Request $request, User $user, TwoFactorAuthenticationService $twoFactor): RedirectResponse
     {
+        abort_if($user->role === 'customer', 403);
         $data = $request->validate([
             'code' => ['required', 'digits:6'],
         ]);
@@ -106,6 +109,7 @@ class UserTwoFactorController extends Controller
 
     public function destroy(Request $request, User $user): RedirectResponse
     {
+        abort_if($user->role === 'customer', 403);
         $request->validate([
             'current_password' => ['required', 'current_password:web'],
         ]);

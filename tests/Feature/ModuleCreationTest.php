@@ -396,7 +396,7 @@ class ModuleCreationTest extends TestCase
         $this->actingAs($this->manager)->get("/modules/commandes/{$order->id}")->assertInertia(fn(Assert $page)=>$page
             ->component('Module/OrderShow')
             ->where('order.number',$order->number)
-            ->where('company.address','Lot IIB 106 Ambatomainty Antananarivo')
+            ->where('company.address',config('madina.company.address'))
             ->where('company.contact','+261 38 26 011 11')
             ->where('company.whatsapp','+261 38 26 011 11')
             ->where('company.email','contactmadinaimport@gmail.com')
@@ -459,15 +459,16 @@ class ModuleCreationTest extends TestCase
         $this->actingAs($this->manager)->get("/modules/catalogue/{$product->id}/edit")->assertInertia(fn(Assert $page)=>$page
             ->where('module','catalogue')
             ->where('fields',fn($fields)=>collect($fields)->contains(fn($field)=>$field['name']==='catalog_description'))
+            ->where('fields',fn($fields)=>collect($fields)->contains(fn($field)=>$field['name']==='public_availability_status'&&count($field['options'])===3))
         );
 
         $this->actingAs($this->manager)->put("/modules/catalogue/{$product->id}",[
             'slug'=>'produit-catalogue-separe','category'=>'Maison','short_description'=>'Description courte','catalog_description'=>'Description complète du catalogue',
-            'is_published'=>1,'is_featured'=>1,'show_price'=>1,
+            'public_availability_status'=>'on_order','is_published'=>1,'is_featured'=>1,'show_price'=>1,
         ])->assertRedirect('/modules/catalogue');
 
         $this->assertDatabaseHas('inventory_products',[
-            'id'=>$product->id,'slug'=>'produit-catalogue-separe','category'=>'Maison','is_published'=>1,'is_featured'=>1,'show_price'=>1,
+            'id'=>$product->id,'slug'=>'produit-catalogue-separe','category'=>'Maison','public_availability_status'=>'on_order','is_published'=>1,'is_featured'=>1,'show_price'=>1,
         ]);
     }
 

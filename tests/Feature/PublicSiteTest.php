@@ -35,17 +35,22 @@ class PublicSiteTest extends TestCase
     public function test_home_and_catalog_only_expose_published_stock_information(): void
     {
         $published = DB::table('inventory_products')->first();
-        DB::table('inventory_products')->where('id', $published->id)->update(['slug' => 'chaise-disponible', 'is_published' => true, 'is_featured' => true, 'show_price' => true, 'category' => 'Mobilier', 'short_description' => 'Une chaise disponible.']);
+        DB::table('inventory_products')->where('id', $published->id)->update(['slug' => 'chaise-disponible', 'is_published' => true, 'public_availability_status' => 'out_of_stock', 'is_featured' => true, 'show_price' => true, 'category' => 'Mobilier', 'short_description' => 'Une chaise disponible.']);
         $hidden = DB::table('inventory_products')->where('id', '!=', $published->id)->first();
         DB::table('inventory_products')->where('id', $hidden->id)->update(['slug' => 'produit-cache', 'is_published' => false]);
 
         $this->get('/')->assertOk()->assertInertia(fn (Assert $page) => $page
             ->component('Public/Home')->has('products', 1)->where('products.0.slug', 'chaise-disponible')
+            ->where('products.0.availability', 'Rupture')
             ->where('products.0.image_url', '/catalog/products/camera-wifi-4mp.png')
             ->missing('products.0.purchase_price')->missing('products.0.stock_value')
         );
         $this->get('/catalogue')->assertOk()->assertInertia(fn (Assert $page) => $page
             ->component('Public/Catalog')->has('products', 1)->where('products.0.price', (int) $published->sale_price)
+            ->where('products.0.availability', 'Rupture')
+        );
+        $this->get('/catalogue/chaise-disponible')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('Public/Product')->where('product.availability', 'Rupture')
         );
         $this->get('/catalogue/produit-cache')->assertNotFound();
     }

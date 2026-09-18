@@ -13,14 +13,29 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 class AuthenticatedSessionController extends Controller
 {
     /**
      * Display the login view.
      */
-    public function create(): Response
+    public function create(Request $request): Response
     {
+        // Customer login can leave a checkout destination in this browser's session.
+        // Management login must only retain destinations in the back office.
+        $intended = $request->session()->get('url.intended');
+        if (is_string($intended)) {
+            try {
+                $route = app('router')->getRoutes()->match(Request::create($intended));
+                if (! in_array('backoffice.account', $route->gatherMiddleware(), true)) {
+                    $request->session()->forget('url.intended');
+                }
+            } catch (HttpExceptionInterface $e) {
+                $request->session()->forget('url.intended');
+            }
+        }
+
         return Inertia::render('Auth/Login', [
             'canResetPassword' => Route::has('password.request'),
             'status' => session('status'),
@@ -41,7 +56,13 @@ class AuthenticatedSessionController extends Controller
             $code = trim((string) $request->input('code'));
             if ($code === '') {
                 Auth::guard('web')->logout();
-                throw ValidationException::withMessages(['code' => 'Le code Google Authenticator est obligatoire pour ce compte.']);
+                $request->session()->put('two_factor_login', [
+                    'user_id' => $user->id,
+                    'remember' => $request->boolean('remember'),
+                    'expires_at' => time() + 300,
+                ]);
+
+                return redirect()->route('two-factor.challenge');
             }
 
             $key = 'two-factor-login:'.$user->id.'|'.$request->ip();

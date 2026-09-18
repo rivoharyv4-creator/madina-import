@@ -1,6 +1,7 @@
+import { useCart } from '@/lib/cart';
 import BrandLogo from '@/Components/BrandLogo';
-import { Link } from '@inertiajs/react';
-import { ArrowUpRight, Menu, Moon, Sun, X } from 'lucide-react';
+import { Link, usePage } from '@inertiajs/react';
+import { ArrowUpRight, Menu, Moon, ShoppingCart, Sun, UserRound, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export type PublicConfig = {
@@ -20,6 +21,11 @@ const links = [
 ];
 
 export default function PublicLayout({ children, config }: { children: React.ReactNode; config: PublicConfig }) {
+    const cart = useCart();
+    const { auth } = usePage().props;
+    const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+    const isCustomer = auth.user?.role === 'customer';
+    const accountLabel = isCustomer ? 'Mon compte' : 'Connexion client';
     const [open, setOpen] = useState(false);
     const [theme, setTheme] = useState<'light' | 'dark'>(() => {
         if (typeof window === 'undefined') return 'light';
@@ -41,11 +47,11 @@ export default function PublicLayout({ children, config }: { children: React.Rea
             </a>
 
             <header className="fixed inset-x-0 top-0 z-50 border-b border-black/[.07] bg-white/95 backdrop-blur-md">
-                <div className="public-container flex h-[72px] items-center gap-8">
+                <div className="public-container flex h-[72px] items-center gap-3 xl:gap-6">
                     <Link href="/" aria-label="Madina Import — Accueil" className="mr-auto flex items-center">
                         <BrandLogo className="h-14 w-[76px]" />
                     </Link>
-                    <nav className="hidden h-full items-center gap-7 lg:flex" aria-label="Navigation principale">
+                    <nav className="hidden h-full items-center gap-5 2xl:flex" aria-label="Navigation principale">
                         {links.map(([label, href]) => {
                             const active = href === '/' ? path === '/' : href.startsWith('/#') ? false : path.startsWith(href);
                             return (
@@ -59,6 +65,14 @@ export default function PublicLayout({ children, config }: { children: React.Rea
                             );
                         })}
                     </nav>
+                    <Link href="/panier" aria-label={`Panier, ${cartCount} produits`} title="Votre panier" className="relative grid size-10 shrink-0 place-items-center rounded-full transition hover:bg-black/5 hover:text-[#C8102E] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C8102E]">
+                        <ShoppingCart size={21} aria-hidden="true" />
+                        {cartCount > 0 && <span aria-live="polite" aria-atomic="true" className="absolute -right-1 -top-1 grid min-w-5 place-items-center rounded-full bg-[#C8102E] px-1 text-[10px] font-bold leading-5 text-white">{cartCount}</span>}
+                    </Link>
+                    <Link href={isCustomer ? '/mes-commandes' : '/connexion'} aria-label={accountLabel} title={accountLabel} className="grid size-10 shrink-0 place-items-center rounded-full transition hover:bg-black/5 hover:text-[#C8102E] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C8102E]">
+                        <UserRound size={21} aria-hidden="true" />
+                    </Link>
+
                     <button
                         type="button"
                         onClick={toggleTheme}
@@ -78,7 +92,7 @@ export default function PublicLayout({ children, config }: { children: React.Rea
                     <button
                         type="button"
                         onClick={() => setOpen(!open)}
-                        className="grid size-10 place-items-center rounded-md border border-black/10 lg:hidden"
+                        className="grid size-10 place-items-center rounded-md border border-black/10 2xl:hidden"
                         aria-expanded={open}
                         aria-label="Ouvrir le menu"
                     >
@@ -86,13 +100,14 @@ export default function PublicLayout({ children, config }: { children: React.Rea
                     </button>
                 </div>
                 {open && (
-                    <nav className="border-t border-black/5 bg-white px-5 py-5 lg:hidden" aria-label="Navigation mobile">
+                    <nav className="border-t border-black/5 bg-white px-5 py-5 2xl:hidden" aria-label="Navigation mobile">
                         <div className="mx-auto flex max-w-xl flex-col">
                             {links.map(([label, href]) => (
                                 <Link key={href} href={href} onClick={() => setOpen(false)} className="border-b border-black/5 py-3 text-sm font-bold">
                                     {label}
                                 </Link>
                             ))}
+
                             <a href={whatsapp} className="public-button mt-5">Demander un devis</a>
                         </div>
                     </nav>

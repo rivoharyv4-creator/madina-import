@@ -2,12 +2,10 @@
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\ConfirmablePasswordController;
-use App\Http\Controllers\Auth\EmailVerificationNotificationController;
-use App\Http\Controllers\Auth\EmailVerificationPromptController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\TwoFactorChallengeController;
-use App\Http\Controllers\Auth\VerifyEmailController;
+use App\Http\Controllers\CustomerAuthController;
 use Illuminate\Support\Facades\Route;
 
 $adminLoginPath = trim((string) config('madina.admin_login_path', 'madina-gestion-e2e26c5871bf4033b6ee1a4769e47ff7'), '/');
@@ -36,15 +34,15 @@ Route::middleware('guest')->group(function () use ($adminLoginPath) {
 });
 
 Route::middleware('auth')->group(function () {
-    Route::get('verify-email', EmailVerificationPromptController::class)
+    Route::get('verify-email', [CustomerAuthController::class, 'notice'])
         ->name('verification.notice');
 
-    Route::get('verify-email/{id}/{hash}', VerifyEmailController::class)
-        ->middleware(['signed', 'throttle:6,1'])
+    Route::post('verify-email', [CustomerAuthController::class, 'verify'])
+        ->middleware('throttle:customer-code')
         ->name('verification.verify');
 
-    Route::post('email/verification-notification', [EmailVerificationNotificationController::class, 'store'])
-        ->middleware('throttle:6,1')
+    Route::post('email/verification-notification', [CustomerAuthController::class, 'resend'])
+        ->middleware('throttle:customer-code')
         ->name('verification.send');
 
     Route::get('confirm-password', [ConfirmablePasswordController::class, 'show'])

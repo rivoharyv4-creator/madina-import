@@ -11,6 +11,24 @@ class AuthenticationTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_management_login_discards_customer_checkout_destination(): void
+    {
+        $this->withoutVite();
+        $user = User::factory()->create();
+        $this->get('/connexion')->assertOk();
+        $this->get(route('login'))->assertOk()->assertSessionMissing('url.intended');
+        $this->post(route('login'), ['email' => $user->email, 'password' => 'password'])
+            ->assertRedirect('/dashboard');
+        $this->get('/dashboard')->assertOk();
+    }
+
+    public function test_management_login_preserves_back_office_destination(): void
+    {
+        $this->withoutVite();
+        $this->withSession(['url.intended' => url('/modules/stock')])->get(route('login'))
+            ->assertOk()->assertSessionHas('url.intended', url('/modules/stock'));
+    }
+
     public function test_login_screen_can_be_rendered(): void
     {
         $response = $this->get(route('login', absolute: false));

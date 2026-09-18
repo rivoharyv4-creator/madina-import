@@ -15,6 +15,7 @@ const display=(key:string,value:any)=>{
  if(key==='is_published') return value?'Publié':'Non publié';
  if(key==='is_featured') return value?'Oui':'Non';
  if(key==='show_price') return value?'Afficher':'Masquer';
+ if(key==='public_availability_status') return ({out_of_stock:'Rupture',available_now:'Disponible de suite',on_order:'Sur commande'} as Record<string,string>)[String(value)]||String(value);
  if(['status','sourcing_priority'].includes(key)&&quoteRequestLabels[String(value)]) return quoteRequestLabels[String(value)];
  if(moneyKeys.some(item=>key.includes(item))) return new Intl.NumberFormat('de-DE',{maximumFractionDigits:0}).format(Number(value))+' Ar';
  if(key.endsWith('_at')) return new Date(value).toLocaleDateString('fr-FR');

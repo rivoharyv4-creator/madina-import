@@ -2,15 +2,15 @@
 
 return [
     'company' => [
-        'name' => env('COMPANY_NAME','MADINA IMPORT'),
-        'email' => env('COMPANY_EMAIL','contactmadinaimport@gmail.com'),
-        'contact' => env('COMPANY_CONTACT','+261 38 26 011 11'),
-        'whatsapp' => env('COMPANY_WHATSAPP','+261 38 26 011 11'),
-        'address' => env('COMPANY_ADDRESS','Lot IIB 106, Ambatomainty - Manjakaray, Antananarivo'),
-        'timezone' => env('COMPANY_TIMEZONE','Asia/Shanghai'),
-        'nif' => env('COMPANY_NIF','4019196145'),
-        'rcs' => env('COMPANY_RCS','2025B00524'),
-        'stat' => env('COMPANY_STAT','46101 11 2025 0 10528'),
+        'name' => env('COMPANY_NAME', 'MADINA IMPORT'),
+        'email' => env('COMPANY_EMAIL', 'contactmadinaimport@gmail.com'),
+        'contact' => env('COMPANY_CONTACT', '+261 38 26 011 11'),
+        'whatsapp' => env('COMPANY_WHATSAPP', '+261 38 26 011 11'),
+        'address' => env('COMPANY_ADDRESS', 'Lot IIB 106, Ambatomainty - Manjakaray, Antananarivo'),
+        'timezone' => env('COMPANY_TIMEZONE', 'Asia/Shanghai'),
+        'nif' => env('COMPANY_NIF', '4019196145'),
+        'rcs' => env('COMPANY_RCS', '2025B00524'),
+        'stat' => env('COMPANY_STAT', '46101 11 2025 0 10528'),
     ],
     'public' => [
         'madagascar_phone' => env('PUBLIC_MADAGASCAR_PHONE', '+261 38 26 011 11'),
@@ -22,6 +22,7 @@ return [
     'backup_path' => env('BACKUP_PATH') ?: storage_path('app/backups'),
     'backup_retention_days' => (int) env('BACKUP_RETENTION_DAYS', 14),
     'persistent_directories' => [
+        'customer-payment-proofs',
         'products',
         'payments',
         'expenses',

@@ -16,6 +16,7 @@
         "laravel/tinker": "^3.0",
         "maatwebsite/excel": "^4.0",
         "pragmarx/google2fa": "8.0",
+        "resend/resend-php": "^1.15",
         "tightenco/ziggy": "^2.0"
     },
     "require-dev": {

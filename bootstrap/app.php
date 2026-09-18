@@ -2,6 +2,8 @@
 
 use App\Http\Middleware\AddSecurityHeaders;
 use App\Http\Middleware\Authenticate;
+use App\Http\Middleware\EnsureBackOfficeAccount;
+use App\Http\Middleware\EnsureCustomerAccount;
 use App\Http\Middleware\EnsureModuleAccess;
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -19,8 +21,13 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withCommands()
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->redirectUsersTo(fn (Request $request) => $request->user()?->role === 'customer'
+            ? route('customer.orders.index')
+            : route('dashboard'));
         $middleware->alias([
             'auth' => Authenticate::class,
+            'customer.account' => EnsureCustomerAccount::class,
+            'backoffice.account' => EnsureBackOfficeAccount::class,
             'super.admin' => EnsureSuperAdmin::class,
             'module.access' => EnsureModuleAccess::class,
         ]);

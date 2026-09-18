@@ -15,7 +15,8 @@ class UserManagementController extends Controller
     public function index(): Response
     {
         return Inertia::render('Users/Index', [
-            'users' => User::query()->orderByRaw("role = 'super_admin' desc")->orderBy('name')->get(['id', 'name', 'email', 'role', 'permissions', 'active', 'created_at', 'two_factor_confirmed_at'])->map(fn (User $user) => [
+            'notice' => session('missing_user'),
+            'users' => User::query()->whereIn('role', ['super_admin', 'admin', 'assistant', 'user'])->orderByRaw("role = 'super_admin' desc")->orderBy('name')->get(['id', 'name', 'email', 'role', 'permissions', 'active', 'created_at', 'two_factor_confirmed_at'])->map(fn (User $user) => [
                 ...$user->only(['id', 'name', 'email', 'role', 'permissions', 'active', 'created_at']),
                 'two_factor_enabled' => $user->hasTwoFactorAuthentication(),
             ]),
@@ -38,7 +39,7 @@ class UserManagementController extends Controller
 
     public function update(Request $request, User $user): RedirectResponse
     {
-        abort_if($user->isSuperAdmin(), 403, 'Le compte super administrateur ne peut pas être modifié ici.');
+        abort_if($user->isSuperAdmin() || $user->role === 'customer', 403, 'Le compte super administrateur ne peut pas être modifié ici.');
         $data = $this->validated($request, $user);
         if (empty($data['password'])) {
             unset($data['password']);
