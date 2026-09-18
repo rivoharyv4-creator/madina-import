@@ -1,5 +1,6 @@
 <?php
 
+use Database\Seeders\TestCatalogueSeeder;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -10,6 +11,16 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('madina:backup')->dailyAt('02:00')->withoutOverlapping();
+
+Artisan::command('madina:test-catalogue {--force : Allow migrations and test products in production}', function () {
+    $options = ['--force' => (bool) $this->option('force')];
+    $status = $this->call('migrate', $options);
+    if ($status !== 0) {
+        return $status;
+    }
+
+    return $this->call('db:seed', ['--class' => TestCatalogueSeeder::class, ...$options]);
+})->purpose('Apply migrations then restore the three shared stock and catalogue test products');
 
 Artisan::command('madina:mail-status', function () {
     $this->table(['Setting', 'Effective value'], [

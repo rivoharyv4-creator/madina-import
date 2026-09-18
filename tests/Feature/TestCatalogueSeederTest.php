@@ -16,7 +16,7 @@ class TestCatalogueSeederTest extends TestCase
     {
         Storage::fake('persistent');
         $userCount = DB::table('users')->count();
-        $this->seed(TestCatalogueSeeder::class);
+        $this->artisan('madina:test-catalogue')->assertExitCode(0);
         $this->assertSame(3, DB::table('inventory_products')->count());
         $this->assertSame(['available_now', 'on_order', 'out_of_stock'], DB::table('inventory_products')->orderBy('public_availability_status')->pluck('public_availability_status')->all());
         foreach (DB::table('inventory_products')->get() as $product) {
