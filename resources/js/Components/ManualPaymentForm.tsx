@@ -61,10 +61,10 @@ export default function ManualPaymentForm({ number, accounts }: { number: string
         </fieldset>
         {selected && <div className="order-tint rounded-lg p-4">
             <h3 className="mb-4 text-sm font-bold">Détails du compte destinataire ({selected.method})</h3>
-            <div className="flex flex-wrap items-center gap-5">
+            <div className="grid grid-cols-2 items-center gap-x-4 gap-y-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:gap-x-5">
                 <div className="min-w-0 flex-1"><p className="order-muted text-sm">Titulaire</p><p className="mt-1 break-words font-bold">{selected.account_holder}</p></div>
-                <div className="order-divider min-w-0 flex-1 border-l pl-5"><p className="order-muted text-sm">Numéro</p><p className="mt-1 break-all font-bold">{selected.account_number}</p></div>
-                <button type="button" disabled={form.processing} className="manual-payment-copy inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold" onClick={async () => {
+                <div className="order-divider min-w-0 border-l pl-4 sm:pl-5"><p className="order-muted text-sm">Numéro</p><p className="mt-1 break-all font-bold">{selected.account_number}</p></div>
+                <button type="button" disabled={form.processing} className="manual-payment-copy col-span-2 inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-bold sm:col-span-1" onClick={async () => {
                     try { await navigator.clipboard.writeText(selected.account_number); setCopied('Numéro copié.'); }
                     catch { setCopied('Copiez le numéro affiché ci-dessus.'); }
                 }}><Copy size={17} aria-hidden="true"/>Copier le numéro</button>

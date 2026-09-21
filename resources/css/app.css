@@ -95,6 +95,7 @@
 .theme-dark .customer-auth-decoration { color:#828b98; }
 @media(max-width:900px) { .customer-auth-decoration { display:none; } }
 @media(max-width:639px) { .customer-auth-card { padding:2.25rem 1.5rem; border-radius:1.25rem; } }
+@media(max-width:767px) { .public-site :is(input,textarea,select) { font-size:1rem; } }
 .commerce input, .commerce textarea, .commerce select { border-radius: .5rem; border-color: #aaa; background: white; color: #171717; }
 .commerce button:disabled { opacity: .5; cursor: wait; }
 .commerce :is(button,a,input,textarea,select):focus-visible { outline: 3px solid #C8102E; outline-offset: 3px; }
