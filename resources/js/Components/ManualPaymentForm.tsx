@@ -39,11 +39,11 @@ export default function ManualPaymentForm({ number, accounts }: { number: string
             if (fileInput.current) fileInput.current.value = '';
         } });
     }}>
-        <div className="flex flex-wrap items-start justify-between gap-4">
-            <h2 className="text-xl font-bold">Paiement manuel</h2>
-            <div className="manual-payment-notice flex items-center gap-3 rounded-lg border px-3 py-2">
+        <div className="space-y-4">
+            <h2 className="text-xl font-bold">Vérification du paiement</h2>
+            <div className="manual-payment-notice flex items-start gap-3 rounded-lg border px-3 py-3">
                 <CircleAlert size={24} className="shrink-0" aria-hidden="true"/>
-                <div><p className="text-sm font-bold">Vérification manuelle</p><p className="mt-1 text-xs">Le paiement sera vérifié manuellement par notre équipe.</p></div>
+                <p className="text-sm leading-6"><strong>Remarque :</strong> si vous êtes un nouveau client, votre paiement sera vérifié manuellement. Cette opération peut prendre de 24 à 48 heures en moyenne. Aucune action n’est nécessaire de votre part. Vous recevrez un e-mail de confirmation lorsque la vérification sera terminée. Merci pour votre compréhension.</p>
             </div>
         </div>
         <p className="text-sm leading-6">Effectuez le paiement en dehors du site, puis transmettez votre référence et une preuve de paiement si demandée.<br/>L’envoi de ces éléments ne confirme pas le paiement. <strong>Il s’agit d’une demande de vérification manuelle.</strong></p>

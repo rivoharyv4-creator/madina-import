@@ -46,7 +46,7 @@ class ModuleController extends Controller
             'employes' => ['title' => 'Employés', 'table' => 'employees', 'primary' => 'Nouvel employé', 'editable' => true, 'related_action' => ['label' => 'Retour aux salaires', 'href' => '/modules/salaires'], 'columns' => ['name' => 'Nom et prénom', 'position' => 'Poste', 'monthly_salary' => 'Salaire habituel', 'irsa_mode' => 'Mode IRSA', 'active' => 'Statut']],
             'fiscalite' => ['title' => 'Fiscalité', 'table' => 'tax_records', 'primary' => 'Calculer la fiscalité annuelle', 'editable' => true, 'columns' => ['fiscal_year' => 'Année', 'base_amount' => 'Bénéfice annuel', 'rate' => 'Taux', 'calculated_amount' => 'Fiscalité estimée', 'status' => 'Statut']],
             'rapports' => ['title' => 'Rapports', 'table' => 'audit_logs', 'primary' => null, 'columns' => ['event' => 'Opération', 'auditable_type' => 'Module', 'user_id' => 'Utilisateur', 'created_at' => 'Date']],
-            'parametres' => ['title' => 'Paramètres', 'table' => 'users', 'primary' => null, 'columns' => ['name' => 'Manager', 'email' => 'E-mail', 'created_at' => 'Créé le']],
+            'parametres' => ['title' => 'Paramètres', 'table' => 'users', 'primary' => null, 'columns' => ['name' => 'Utilisateur interne', 'role' => 'Rôle', 'email' => 'E-mail', 'created_at' => 'Créé le']],
         ][$module] ?? abort(404);
     }
 
@@ -1329,6 +1329,9 @@ class ModuleController extends Controller
     {
         $table = $config['table'];
         $query = DB::table($table)->orderByDesc($table.'.id');
+        if ($table === 'users') {
+            $query->whereIn('users.role', ['super_admin', 'admin', 'assistant', 'user']);
+        }
         if ($table === 'orders') {
             $query->where(function ($orders) {
                 $orders->whereNull('orders.user_id')->orWhere(function ($webOrders) {
