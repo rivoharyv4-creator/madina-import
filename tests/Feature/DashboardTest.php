@@ -28,6 +28,24 @@ class DashboardTest extends TestCase
         $this->get('/register')->assertNotFound();
     }
 
+    public function test_settings_list_only_displays_internal_users_with_an_explicit_role(): void
+    {
+        $manager = User::factory()->create(['name' => 'Manager interne']);
+        User::factory()->create([
+            'name' => 'Client public',
+            'role' => 'customer',
+            'permissions' => [],
+        ]);
+
+        $this->actingAs($manager)->get('/modules/parametres')->assertInertia(fn (Assert $page) => $page
+            ->where('config.columns.name', 'Utilisateur interne')
+            ->where('config.columns.role', 'Rôle')
+            ->where('rows', fn ($rows) => collect($rows)->contains('name', 'Manager interne')
+                && ! collect($rows)->contains('name', 'Client public')
+                && collect($rows)->every(fn ($row) => in_array($row['role'], ['super_admin', 'admin', 'assistant', 'user'], true)))
+        );
+    }
+
     public function test_madina_revenue_deducts_only_costs_directly_linked_to_invoiced_orders(): void
     {
         $user = User::factory()->create(['email_verified_at' => now()]);
