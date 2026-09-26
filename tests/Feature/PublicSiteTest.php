@@ -47,6 +47,7 @@ class PublicSiteTest extends TestCase
         );
         $this->get('/catalogue')->assertOk()->assertInertia(fn (Assert $page) => $page
             ->component('Public/Catalog')->has('products', 1)->where('products.0.price', (int) $published->sale_price)
+            ->where('products.0.id', fn ($id) => is_int($id) && $id === (int) $published->id)
             ->where('products.0.availability', 'Rupture')
         );
         $this->get('/catalogue/chaise-disponible')->assertOk()->assertInertia(fn (Assert $page) => $page

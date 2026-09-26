@@ -4,7 +4,10 @@ export type CartItem = { id: number; quantity: number; name: string; price: numb
 export function readCart(): CartItem[] {
     try {
         const data = JSON.parse(localStorage.getItem(CART_KEY) || '[]');
-        return Array.isArray(data) ? data.filter(i => Number.isInteger(i.id) && Number.isInteger(i.quantity) && i.quantity > 0 && i.quantity <= 10000 && typeof i.name === 'string' && Number.isFinite(i.price)).slice(0,100) : [];
+        if (!Array.isArray(data)) return [];
+        return data.map(i => ({ ...i, id: Number(i.id), quantity: Number(i.quantity), price: Number(i.price) }))
+            .filter(i => Number.isInteger(i.id) && i.id > 0 && Number.isInteger(i.quantity) && i.quantity > 0 && i.quantity <= 10000 && typeof i.name === 'string' && Number.isFinite(i.price))
+            .slice(0,100);
     } catch { return []; }
 }
 export function writeCart(items: CartItem[]) {

@@ -131,7 +131,7 @@ class PublicSiteController extends Controller
             'on_order'=>'Sur commande',
             default=>'Disponible de suite',
         };
-        return ['id'=>$product->id,'slug'=>$product->slug,'reference'=>$product->reference,'name'=>$product->name,'category'=>$product->category,'short_description'=>$product->short_description,'availability'=>$availability,'price'=>$product->show_price?(float)$product->sale_price:null,'image_url'=>$product->photo_path?route('public.catalog.image',[$product->slug,0]):$this->catalogMockup($product->reference)];
+        return ['id'=>(int) $product->id,'slug'=>$product->slug,'reference'=>$product->reference,'name'=>$product->name,'category'=>$product->category,'short_description'=>$product->short_description,'availability'=>$availability,'price'=>$product->show_price?(float)$product->sale_price:null,'image_url'=>$product->photo_path?route('public.catalog.image',[$product->slug,0]):$this->catalogMockup($product->reference)];
     }
 
     private function catalogMockup(?string $reference): ?string
