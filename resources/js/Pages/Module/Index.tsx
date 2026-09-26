@@ -12,7 +12,7 @@ const display=(key:string,value:any)=>{
  if(value===null||value===undefined||value==='') return '—';
  if(key==='order_id'&&String(value).includes('::')) {const [id,label]=String(value).split('::',2);return <Link href={`/modules/commandes/${id}`} className="font-semibold text-[#BD2433] hover:underline">{label}</Link>;}
  if(key==='active') return value?'Actif':'Inactif';
- if(key==='is_published') return value?'Publié':'Non publié';
+ if(key==='is_published') {const published=Number(value)===1;return <><span aria-hidden="true" className={`mr-1.5 size-2 rounded-full ${published?'bg-emerald-500':'bg-gray-300'}`}/>{published?'Publié':'Non publié'}</>;}
  if(key==='is_featured') return value?'Oui':'Non';
  if(key==='show_price') return value?'Afficher':'Masquer';
  if(key==='public_availability_status') return ({out_of_stock:'Rupture',available_now:'Disponible de suite',on_order:'Sur commande'} as Record<string,string>)[String(value)]||String(value);
@@ -46,7 +46,7 @@ export default function Index({module,config,rows,pagination,query,filterOptions
    <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 p-4">
     <form onSubmit={submit} className="relative min-w-[240px] flex-1"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/><input value={q} onChange={event=>setQ(event.target.value)} className="field pl-9" placeholder={`Rechercher dans ${config.title.toLowerCase()}…`}/></form>
     {!!filterOptions.length&&<span className="grid size-10 place-items-center rounded-xl bg-gray-100 text-gray-500" title="Filtres"><SlidersHorizontal size={17}/></span>}
-    {filterOptions.map(filter=><select key={filter.field} value={filters[filter.field]||''} onChange={event=>setFilters(current=>({...current,[filter.field]:event.target.value}))} aria-label={`Filtrer par ${filter.label}`} title={`Filtrer par ${filter.label}`} className="field !w-auto min-w-40"><option value="">Tous</option>{filter.options.map(option=><option key={option.value} value={option.value}>{option.label}</option>)}</select>)}
+    {filterOptions.map(filter=><select key={filter.field} value={filters[filter.field]||''} onChange={event=>setFilters(current=>({...current,[filter.field]:event.target.value}))} aria-label={`Filtrer par ${filter.label}`} title={`Filtrer par ${filter.label}`} className="field !w-auto min-w-40"><option value="">Tous — {filter.label}</option>{filter.options.map(option=><option key={option.value} value={option.value}>{option.label}</option>)}</select>)}
     {hasCriteria&&<button type="button" onClick={()=>{setQ('');setFilters({});}} title="Réinitialiser" aria-label="Réinitialiser la recherche et les filtres" className="grid size-10 place-items-center rounded-xl border border-gray-200 bg-white text-gray-500 transition hover:border-[#BD2433]/30 hover:bg-red-50 hover:text-[#BD2433]"><RotateCcw size={17}/></button>}
     <a href={`/modules/${module}/export${exportQuery?'?'+exportQuery:''}`} className="btn-secondary"><Download size={16}/>{hasCriteria?'Exporter les résultats':'Exporter tous'}</a>
    </div>

@@ -1429,6 +1429,12 @@ class ModuleController extends Controller
 
     private function filterValueLabel(string $module, string $field, mixed $value): string
     {
+        if ($field === 'is_published') {
+            return (bool) $value ? 'Publié' : 'Non publié';
+        }
+        if ($field === 'is_featured') {
+            return (bool) $value ? 'Mis en avant' : 'Non mis en avant';
+        }
         if ($field === 'public_availability_status') {
             return match ($value) {
                 'out_of_stock' => 'Rupture',
