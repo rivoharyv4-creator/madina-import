@@ -4,6 +4,7 @@ import { Download, ExternalLink, Eye, FileDown, FilePlus2, Inbox, Pencil, Plus, 
 import { FormEvent, useEffect, useState } from 'react';
 
 const moneyKeys=['total','amount','price','value','salary','balance','budget'];
+const integerKeys=['quantity','reserved_quantity','available_quantity','alert_threshold'];
 const quoteRequestLabels:Record<string,string>={
  nouveau:'🆕 Nouveau',a_contacter:'📞 À contacter',a_qualifier:'🔎 À qualifier',qualifie:'✅ Qualifié',devis_envoye:'💰 Devis envoyé',en_negociation:'🔄 En négociation',commande_confirmee:'🟢 Commande confirmée',perdu:'🔴 Perdu',en_attente:'⏸️ En attente',
  urgent:'🔴 Urgent',prioritaire:'🟠 Prioritaire',normal:'🟡 Normal',faible:'🟢 Faible',
@@ -17,6 +18,7 @@ const display=(key:string,value:any)=>{
  if(key==='show_price') return value?'Afficher':'Masquer';
  if(key==='public_availability_status') return ({out_of_stock:'Rupture',available_now:'Disponible de suite',on_order:'Sur commande'} as Record<string,string>)[String(value)]||String(value);
  if(['status','sourcing_priority'].includes(key)&&quoteRequestLabels[String(value)]) return quoteRequestLabels[String(value)];
+ if(integerKeys.includes(key)) return new Intl.NumberFormat('fr-FR',{maximumFractionDigits:0}).format(Number(value));
  if(moneyKeys.some(item=>key.includes(item))) return new Intl.NumberFormat('de-DE',{maximumFractionDigits:0}).format(Number(value))+' Ar';
  if(key.endsWith('_at')) return new Date(value).toLocaleDateString('fr-FR');
  if(key.endsWith('_date')||key==='month'||key==='valid_until') return new Date(`${value}T00:00:00`).toLocaleDateString('fr-FR');

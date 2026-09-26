@@ -345,8 +345,8 @@ class ModuleController extends Controller
         $gallery = $data['gallery'] ?? [];
         $origins = $data['origin_order_ids'] ?? [];
         unset($data['photo'],$data['gallery'],$data['origin_order_ids']);
-        $quantity = (float) $data['quantity'];
-        $reserved = (float) ($data['reserved_quantity'] ?? 0);
+        $quantity = (int) $data['quantity'];
+        $reserved = (int) ($data['reserved_quantity'] ?? 0);
         $data['slug'] = $this->uniqueProductSlug($data['slug'] ?? $data['name']);
         $reference = trim((string) ($data['reference'] ?? '')) ?: $numbers->next('product');
         $id = DB::table('inventory_products')->insertGetId([...$data, 'reserved_quantity' => $reserved, 'available_quantity' => max(0, $quantity - $reserved), 'total_purchase_cost' => $quantity * (float) $data['purchase_price'] + (float) ($data['freight'] ?? 0), 'sale_total' => $quantity * (float) $data['sale_price'], 'gallery_paths' => json_encode($this->storeGallery($gallery)), 'photo_path' => $this->storePhoto($photo), 'reference' => $reference, 'stock_value' => $quantity * (float) $data['purchase_price'], 'entered_at' => $quantity > 0 ? today() : null, 'exited_at' => null, 'created_at' => now(), 'updated_at' => now()]);
@@ -366,9 +366,9 @@ class ModuleController extends Controller
         unset($data['photo'],$data['gallery'],$data['origin_order_ids']);
         $data['slug'] = $this->uniqueProductSlug($data['slug'] ?? $data['name'], $id);
         $data['reference'] = trim((string) ($data['reference'] ?? '')) ?: $old->reference;
-        $before = (float) $old->quantity;
-        $after = (float) $data['quantity'];
-        $reserved = (float) ($data['reserved_quantity'] ?? 0);
+        $before = (int) $old->quantity;
+        $after = (int) $data['quantity'];
+        $reserved = (int) ($data['reserved_quantity'] ?? 0);
         DB::table('inventory_products')->where('id', $id)->update([...$data, 'reserved_quantity' => $reserved, 'available_quantity' => max(0, $after - $reserved), 'total_purchase_cost' => $after * (float) $data['purchase_price'] + (float) ($data['freight'] ?? 0), 'sale_total' => $after * (float) $data['sale_price'], 'gallery_paths' => $gallery ? json_encode($this->storeGallery($gallery)) : $old->gallery_paths, 'photo_path' => $photo ? $this->storePhoto($photo) : $old->photo_path, 'stock_value' => $after * (float) $data['purchase_price'], 'entered_at' => $after > $before ? today() : $old->entered_at, 'exited_at' => $after < $before ? today() : $old->exited_at, 'updated_at' => now()]);
         $this->syncStockOrigins($id, $origins);
         if ($after !== $before) {
@@ -657,6 +657,11 @@ class ModuleController extends Controller
             $values['order_id'] = DB::table('supplier_payment_allocations')->where('supplier_payment_id', $record->id)->value('order_id');
         }
         if ($module === 'stock') {
+            foreach (['quantity', 'reserved_quantity', 'available_quantity', 'alert_threshold'] as $field) {
+                if ($values[$field] !== null) {
+                    $values[$field] = (int) $values[$field];
+                }
+            }
             $values['origin_order_ids'] = DB::table('inventory_product_origins')->where('inventory_product_id', $record->id)->pluck('order_id')->map(fn ($id) => (string) $id)->all();
         }
         if ($module === 'paiements') {
@@ -1047,10 +1052,10 @@ class ModuleController extends Controller
                 $input('reference', 'Référence produit / SKU', 'text', false) + ['section' => 'Identification produit'],
                 $input('name', 'Nom du produit') + ['section' => 'Identification produit'],
                 $input('photo', 'Photo produit', 'file', false) + ['section' => 'Identification produit'],
-                $input('quantity', 'Quantité en stock', 'number', true, 0) + ['section' => 'Identification produit'],
-                $input('reserved_quantity', 'Quantité réservée', 'number', false, 0) + ['section' => 'Identification produit'],
-                $input('available_quantity', 'Quantité disponible', 'number', false, 0) + ['section' => 'Identification produit', 'readOnly' => true],
-                $input('alert_threshold', 'Seuil d’alerte', 'number', false) + ['section' => 'Identification produit'],
+                $input('quantity', 'Quantité en stock', 'number', true, 0) + ['section' => 'Identification produit', 'integer' => true],
+                $input('reserved_quantity', 'Quantité réservée', 'number', false, 0) + ['section' => 'Identification produit', 'integer' => true],
+                $input('available_quantity', 'Quantité disponible', 'number', false, 0) + ['section' => 'Identification produit', 'readOnly' => true, 'integer' => true],
+                $input('alert_threshold', 'Seuil d’alerte', 'number', false) + ['section' => 'Identification produit', 'integer' => true],
                 $input('purchase_price', 'Prix d’achat unitaire (Ar)', 'number') + ['section' => 'Coûts d’achat & transport'],
                 $input('cbm', 'CBM / volume', 'number', false) + ['section' => 'Coûts d’achat & transport'],
                 $input('freight', 'Fret alloué au produit (Ar)', 'number', false, 0) + ['section' => 'Coûts d’achat & transport'],

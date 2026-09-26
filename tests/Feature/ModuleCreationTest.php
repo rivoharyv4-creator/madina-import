@@ -99,6 +99,18 @@ class ModuleCreationTest extends TestCase
         $this->assertSame(2,DB::table('order_items')->where('order_id',$order->id)->count());
     }
 
+    public function test_stock_quantities_must_be_whole_numbers(): void
+    {
+        $this->actingAs($this->manager)->post('/modules/stock', [
+            'name' => 'Produit avec quantité fractionnaire',
+            'quantity' => 2.5,
+            'reserved_quantity' => 0.5,
+            'purchase_price' => 1000,
+            'sale_price' => 1500,
+            'alert_threshold' => 1.5,
+        ])->assertSessionHasErrors(['quantity', 'reserved_quantity', 'alert_threshold']);
+    }
+
     public function test_quote_can_contain_multiple_products_and_totals_are_aggregated(): void
     {
         $client=DB::table('clients')->first(); $suppliers=DB::table('suppliers')->limit(2)->pluck('id')->all();
