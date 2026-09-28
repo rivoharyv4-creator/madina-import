@@ -108,6 +108,9 @@
   ::selection { background:#FCF108; color:#2F2F2F; }
   * { scrollbar-width:thin; scrollbar-color:#71717155 transparent; }
 }
+.admin-shell input[type="number"] { appearance:textfield; -moz-appearance:textfield; }
+.admin-shell input[type="number"]::-webkit-inner-spin-button,
+.admin-shell input[type="number"]::-webkit-outer-spin-button { appearance:none; -webkit-appearance:none; margin:0; }
 @layer components {
   .public-site { font-family:"Inter", ui-sans-serif, system-ui, sans-serif; }
   .public-site h1, .public-site h2, .public-site h3 { font-family:"Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, sans-serif; }

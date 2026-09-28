@@ -59,10 +59,10 @@
         <tbody>
         @foreach($items as $item)
             <tr>
-                <td>@if($module==='devis' && $item->photo_data)<img class="product-photo" src="{{ $item->photo_data }}" alt="">@endif<strong>{{ $module==='devis'?$item->name:$item->label }}</strong>@if($module==='devis' && $item->specifications)<div class="description">{{ $item->specifications }}</div>@endif</td>
+                <td>@if($module==='devis' && $item->photo_data)<img class="product-photo" src="{{ $item->photo_data }}" alt="">@endif<strong>{{ $module==='devis'?$item->name:$item->label }}</strong>@if(!empty($item->specifications))<div class="description">{{ $item->specifications }}</div>@endif</td>
                 @php($quantity=(float)($item->quantity??1))
                 @php($amount=(float)($module==='devis'?$item->total:$item->amount))
-                @php($unitPrice=$module==='devis'?(float)$item->supplier_price:(isset($item->unit_price)?(float)$item->unit_price:($quantity>0?$amount/$quantity:0)))
+                @php($unitPrice=isset($item->unit_price)?(float)$item->unit_price:($quantity>0?$amount/$quantity:0))
                 <td class="qty">{{ rtrim(rtrim(number_format($quantity,3,',',' '),'0'),',') }}</td>
                 <td class="amount">{{ number_format($unitPrice,0,',','.') }} Ar</td>
                 <td class="amount">{{ number_format($amount,0,',','.') }} Ar</td>
@@ -71,12 +71,8 @@
         </tbody>
     </table>
 
-    @if($module==='factures' && $document->products->isNotEmpty())
-        <div class="products"><div class="products-title">Produits / articles de la commande</div>@foreach($document->products as $product)<div>• {{ $product->name }} — Qté {{ rtrim(rtrim(number_format((float)$product->quantity,3,',',' '),'0'),',') }}@if($product->specifications) <span class="description">({{ $product->specifications }})</span>@endif</div>@endforeach</div>
-    @endif
-
     <table class="totals">
-        @if($module==='factures')<tr><td>Déjà payé</td><td class="value">{{ number_format((float)$document->paid_amount,0,',','.') }} Ar</td></tr><tr><td>Reste à payer</td><td class="value">{{ number_format((float)$document->balance_due,0,',','.') }} Ar</td></tr>@endif
+        @if($module==='factures')<tr><td>Acompte</td><td class="value">{{ number_format((float)$document->paid_amount,0,',','.') }} Ar</td></tr><tr><td>Reste à payer</td><td class="value">{{ number_format((float)$document->balance_due,0,',','.') }} Ar</td></tr>@endif
         <tr class="grand"><td>Total</td><td class="value">{{ number_format((float)($module==='devis'?$document->total:$document->subtotal),0,',','.') }} Ar</td></tr>
     </table>
 

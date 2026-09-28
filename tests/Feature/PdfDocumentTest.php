@@ -70,11 +70,16 @@ class PdfDocumentTest extends TestCase
             ->where('invoices.id', $invoice->id)
             ->select('invoices.*', 'clients.number as client_number', 'clients.name as client_name', 'clients.contact as client_contact', 'clients.address as client_address', 'orders.number as order_number')
             ->first();
-        $document->products = collect();
-        $html = view('pdf.document', ['module' => 'factures', 'document' => $document, 'items' => collect(json_decode($document->lines)), 'title' => 'FACTURE', 'logoData' => null, 'company' => config('madina.company')])->render();
+        $items = collect(json_decode($document->lines));
+        $items->first()->specifications = 'Description détaillée sous le produit';
+        $html = view('pdf.document', ['module' => 'factures', 'document' => $document, 'items' => $items, 'title' => 'FACTURE', 'logoData' => null, 'company' => config('madina.company')])->render();
         foreach (['Délai d’expédition', '7 à 12 jours', 'Informations bancaires', 'BOA 00001', 'Titulaire : Madina Import', 'Conditions de paiement', '50 % à la commande', 'Garantie', '12 mois', 'Note / remarque', '&lt;script&gt;remarque&lt;/script&gt;'] as $text) {
             $this->assertStringContainsString($text, $html);
         }
+        $this->assertStringContainsString('<td>Acompte</td>', $html);
+        $this->assertStringContainsString('<strong>'.$items->first()->label.'</strong><div class="description">Description détaillée sous le produit</div>', $html);
+        $this->assertStringNotContainsString('Produits / articles de la commande', $html);
+        $this->assertStringNotContainsString('Déjà payé', $html);
         $this->assertStringNotContainsString('<script>remarque</script>', $html);
         $this->get("/modules/factures/{$invoice->id}/pdf")->assertOk()->assertHeader('content-type', 'application/pdf');
 
@@ -102,7 +107,8 @@ class PdfDocumentTest extends TestCase
 
         $this->assertStringContainsString('Prix unitaire', $html);
         $this->assertStringContainsString('Prix de vente', $html);
-        $this->assertStringContainsString('3.700.000 Ar', $html);
+        $this->assertStringContainsString('337.500 Ar', $html);
+        $this->assertStringNotContainsString('3.700.000 Ar', $html);
         $this->assertStringContainsString('<tr class="grand"><td>Total</td><td class="value">6.750.000 Ar</td></tr>', $html);
         $this->assertStringContainsString(config('madina.company.address'), $html);
         $this->assertStringContainsString('Tél. : +261 38 26 011 11', $html);

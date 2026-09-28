@@ -38,7 +38,7 @@ export default function Authenticated({ header, children, action }: PropsWithChi
  const publicRequestCount=Math.max(0,Number(notifications?.publicRequests||0));
  const notificationLabel=publicRequestCount===1?'1 nouvelle demande publique':`${publicRequestCount} nouvelles demandes publiques`;
  const roleLabel=superAdmin?'Super administrateur':auth?.user?.role==='assistant'?'Assistant':'Utilisateur';
- return <div className="min-h-screen bg-[#F8F8F6] text-[#2F2F2F]">
+ return <div className="admin-shell min-h-screen bg-[#F8F8F6] text-[#2F2F2F]">
   {toast&&<div role="status" aria-live="polite" className="fixed right-4 top-4 z-[70] flex max-w-sm items-start gap-3 rounded-xl border border-emerald-200 bg-white px-4 py-3 text-emerald-800 shadow-[0_18px_55px_rgba(47,47,47,.18)] md:right-6 md:top-6"><span className="grid size-9 shrink-0 place-items-center rounded-lg bg-emerald-50"><CheckCircle2 size={19}/></span><div className="min-w-0 flex-1"><strong className="block text-sm">Enregistrement effectué</strong><p className="mt-0.5 text-xs leading-5 text-emerald-700">{toast}</p></div><button type="button" onClick={()=>setToast(null)} aria-label="Fermer la notification" className="rounded-md p-1 text-emerald-500 hover:bg-emerald-50"><X size={15}/></button></div>}
   {open&&<button aria-label="Fermer" className="fixed inset-0 z-30 bg-black/30 lg:hidden" onClick={()=>setOpen(false)}/>} 
   <aside className={`fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col bg-[#2F2F2F] text-white transition-transform print:hidden lg:translate-x-0 ${open?'translate-x-0':'-translate-x-full'}`}>

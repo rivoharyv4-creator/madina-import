@@ -42,6 +42,11 @@ class DemoDataSeederTest extends TestCase
             ->where('pagination.last_page',2)
             ->has('rows',20)
         );
+        $this->actingAs($manager)->get('/modules/catalogue')->assertInertia(fn(Assert $page)=>$page
+            ->has('filterOptions', 2)
+            ->where('filterOptions.0.field', 'is_published')
+            ->where('filterOptions.1.field', 'public_availability_status')
+        );
         $this->actingAs($manager)->get('/modules/clients?q=Client%20D%C3%A9mo%20005')->assertInertia(fn(Assert $page)=>$page
             ->where('pagination.total',1)
             ->has('rows',1)
