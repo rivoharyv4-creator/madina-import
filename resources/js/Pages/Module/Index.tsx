@@ -14,8 +14,8 @@ const display=(key:string,value:any)=>{
  if(key==='order_id'&&String(value).includes('::')) {const [id,label]=String(value).split('::',2);return <Link href={`/modules/commandes/${id}`} className="font-semibold text-[#BD2433] hover:underline">{label}</Link>;}
  if(key==='active') return value?'Actif':'Inactif';
  if(key==='is_published') {const published=Number(value)===1;return <><span aria-hidden="true" className={`mr-1.5 size-2 rounded-full ${published?'bg-emerald-500':'bg-gray-300'}`}/>{published?'Publié':'Non publié'}</>;}
- if(key==='is_featured') return value?'Oui':'Non';
- if(key==='show_price') return value?'Afficher':'Masquer';
+ if(key==='is_featured') return Number(value)===1?'Oui':'Non';
+ if(key==='show_price') return Number(value)===1?'Afficher':'Masquer';
  if(key==='public_availability_status') return ({out_of_stock:'Rupture',available_now:'Disponible de suite',on_order:'Sur commande'} as Record<string,string>)[String(value)]||String(value);
  if(['status','sourcing_priority'].includes(key)&&quoteRequestLabels[String(value)]) return quoteRequestLabels[String(value)];
  if(integerKeys.includes(key)) return new Intl.NumberFormat('fr-FR',{maximumFractionDigits:0}).format(Number(value));
