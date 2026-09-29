@@ -28,6 +28,26 @@ class DashboardTest extends TestCase
         $this->get('/register')->assertNotFound();
     }
 
+    public function test_expenses_are_listed_from_most_recent_spending_date_to_oldest(): void
+    {
+        $user = User::factory()->create();
+        $timestamps = ['created_at' => now(), 'updated_at' => now()];
+
+        DB::table('expenses')->insert([
+            [...$timestamps, 'category' => 'autre', 'amount' => 100, 'spent_at' => '2026-09-20', 'type' => 'business', 'description' => 'Première le même jour', 'status' => 'paye'],
+            [...$timestamps, 'category' => 'autre', 'amount' => 200, 'spent_at' => '2026-09-10', 'type' => 'business', 'description' => 'La plus ancienne', 'status' => 'paye'],
+            [...$timestamps, 'category' => 'autre', 'amount' => 300, 'spent_at' => '2026-09-22', 'type' => 'business', 'description' => 'La plus récente', 'status' => 'paye'],
+            [...$timestamps, 'category' => 'autre', 'amount' => 400, 'spent_at' => '2026-09-20', 'type' => 'business', 'description' => 'Dernière le même jour', 'status' => 'paye'],
+        ]);
+
+        $this->actingAs($user)->get('/modules/depenses')->assertInertia(fn (Assert $page) => $page
+            ->where('rows.0.description', 'La plus récente')
+            ->where('rows.1.description', 'Dernière le même jour')
+            ->where('rows.2.description', 'Première le même jour')
+            ->where('rows.3.description', 'La plus ancienne')
+        );
+    }
+
     public function test_settings_list_only_displays_internal_users_with_an_explicit_role(): void
     {
         $manager = User::factory()->create(['name' => 'Manager interne']);

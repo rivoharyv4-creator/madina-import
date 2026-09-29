@@ -1344,7 +1344,12 @@ class ModuleController extends Controller
     private function exportQuery(array $config, string $search = '', array $filters = [])
     {
         $table = $config['table'];
-        $query = DB::table($table)->orderByDesc($table.'.id');
+        $query = DB::table($table);
+        if ($table === 'expenses') {
+            $query->orderByDesc($table.'.spent_at')->orderByDesc($table.'.id');
+        } else {
+            $query->orderByDesc($table.'.id');
+        }
         if ($table === 'users') {
             $query->whereIn('users.role', ['super_admin', 'admin', 'assistant', 'user']);
         }
