@@ -3,7 +3,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { Download, ExternalLink, Eye, FileDown, FilePlus2, Inbox, Pencil, Plus, RotateCcw, Search, SlidersHorizontal, Star, UsersRound } from 'lucide-react';
 import { FormEvent, useEffect, useState } from 'react';
 
-const moneyKeys=['total','amount','price','value','salary','balance','budget'];
+const moneyKeys=['total','amount','price','value','salary','balance','budget','cost'];
 const integerKeys=['quantity','reserved_quantity','available_quantity','alert_threshold'];
 const quoteRequestLabels:Record<string,string>={
  nouveau:'🆕 Nouveau',a_contacter:'📞 À contacter',a_qualifier:'🔎 À qualifier',qualifie:'✅ Qualifié',devis_envoye:'💰 Devis envoyé',en_negociation:'🔄 En négociation',commande_confirmee:'🟢 Commande confirmée',perdu:'🔴 Perdu',en_attente:'⏸️ En attente',
