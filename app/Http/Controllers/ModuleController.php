@@ -1196,7 +1196,7 @@ class ModuleController extends Controller
             return [];
         }
 
-        return DB::table('order_items')->orderBy('id')->get()->groupBy('order_id')->map(fn ($items) => $items->map(fn ($item) => ['name' => $item->name, 'specifications' => $item->specifications, 'quantity' => $item->quantity, 'client_total' => $item->client_total, 'unit_price' => (float) $item->quantity > 0 ? (float) $item->client_total / (float) $item->quantity : 0, 'photo_url' => $item->photo_path ? '/product-photo/'.basename($item->photo_path) : null])->values()->all())->all();
+        return DB::table('order_items')->orderBy('id')->get()->groupBy('order_id')->map(fn ($items) => $items->map(fn ($item) => ['name' => $item->name, 'specifications' => $item->specifications, 'quantity' => (float) $item->quantity, 'client_total' => $item->client_total, 'unit_price' => (float) $item->quantity > 0 ? (float) $item->client_total / (float) $item->quantity : 0, 'photo_url' => $item->photo_path ? '/product-photo/'.basename($item->photo_path) : null])->values()->all())->all();
     }
 
     private function orderTemplates(string $module): array

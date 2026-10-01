@@ -156,7 +156,7 @@ export default function TrackingPage({ tracking, lookupError, publicConfig }: { 
                             <dl className="mt-3 grid grid-cols-2 gap-2">
                                 <ResultFact icon={<Navigation size={13} />} label="Départ" value={date(activeShipment.china_departure_at)} />
                                 <ResultFact icon={<MapPinCheck size={13} />} label="Arrivée prévue" value={date(activeShipment.expected_madagascar_at)} />
-                                <ResultFact icon={<Box size={13} />} label="Volume" value={activeShipment.cbm?`${activeShipment.cbm} CBM`:'—'} />
+                                <ResultFact icon={<Box size={13} />} label="Volume" value={activeShipment.cbm?`${Number(activeShipment.cbm)} CBM`:'—'} />
                                 <ResultFact icon={<Radio size={13} />} label="Statut" value={statusMeta(activeShipment.status).label} accent />
                             </dl>
 
