@@ -100,4 +100,33 @@ class DashboardTest extends TestCase
             ->where('chart.5.facture', 6000000)
         );
     }
+
+    public function test_dashboard_can_be_filtered_to_last_month(): void
+    {
+        $this->travelTo(now()->setDate(2026, 10, 15));
+        $user = User::factory()->create(['email_verified_at' => now()]);
+        $clientId = DB::table('clients')->insertGetId([
+            'number' => 'CLI-FILTRE-001', 'name' => 'Client filtre', 'contact' => '0340000000',
+            'type' => 'particulier', 'active' => true, 'credit_balance' => 0,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('client_payments')->insert([
+            ['client_id' => $clientId, 'paid_at' => '2026-09-12', 'amount' => 900000, 'allocated_amount' => 0, 'method' => 'Espèces', 'type' => 'acompte', 'status' => 'valide', 'created_at' => now(), 'updated_at' => now()],
+            ['client_id' => $clientId, 'paid_at' => '2026-10-12', 'amount' => 100000, 'allocated_amount' => 0, 'method' => 'Espèces', 'type' => 'acompte', 'status' => 'valide', 'created_at' => now(), 'updated_at' => now()],
+        ]);
+        DB::table('expenses')->insert([
+            ['category' => 'marketing', 'amount' => 250000, 'spent_at' => '2026-09-10', 'type' => 'business', 'description' => 'Septembre', 'status' => 'paye', 'created_at' => now(), 'updated_at' => now()],
+            ['category' => 'transport', 'amount' => 50000, 'spent_at' => '2026-10-10', 'type' => 'business', 'description' => 'Octobre', 'status' => 'paye', 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        $this->actingAs($user)->get('/dashboard?period=last_month')->assertInertia(fn (Assert $page) => $page
+            ->where('periodFilter.value', 'last_month')
+            ->where('periodFilter.label', 'Mois dernier')
+            ->where('metrics.received', 900000)
+            ->where('metrics.business', 250000)
+            ->where('expenseCategories.0.name', 'Marketing')
+            ->where('expenseCategories.0.value', 250000)
+            ->where('chart.5.encaisse', 900000)
+        );
+    }
 }
