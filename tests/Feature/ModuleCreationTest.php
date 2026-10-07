@@ -31,6 +31,40 @@ class ModuleCreationTest extends TestCase
         }
     }
 
+    public function test_orders_and_invoices_are_listed_by_business_date_from_newest_to_oldest(): void
+    {
+        $client = DB::table('clients')->first();
+        $orderDefaults = [
+            'client_id' => $client->id,
+            'manager_id' => $this->manager->id,
+            'origin' => 'directe',
+            'status' => 'brouillon',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+
+        $newerOrderId = DB::table('orders')->insertGetId([...$orderDefaults, 'number' => 'TEST-CHRONO-NEW', 'ordered_at' => '2099-02-01']);
+        $olderOrderId = DB::table('orders')->insertGetId([...$orderDefaults, 'number' => 'TEST-CHRONO-OLD', 'ordered_at' => '2099-01-01']);
+
+        $invoiceDefaults = [
+            'order_id' => $newerOrderId,
+            'client_id' => $client->id,
+            'type' => 'produits',
+            'status' => 'brouillon',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+        DB::table('invoices')->insert([...$invoiceDefaults, 'number' => 'TEST-FAC-NEW', 'issued_at' => '2099-02-01']);
+        DB::table('invoices')->insert([...$invoiceDefaults, 'order_id' => $olderOrderId, 'number' => 'TEST-FAC-OLD', 'issued_at' => '2099-01-01']);
+
+        $this->actingAs($this->manager)->get('/modules/commandes')->assertInertia(fn (Assert $page) => $page
+            ->where('rows.0.number', 'TEST-CHRONO-NEW')
+            ->where('rows.1.number', 'TEST-CHRONO-OLD'));
+        $this->actingAs($this->manager)->get('/modules/factures')->assertInertia(fn (Assert $page) => $page
+            ->where('rows.0.number', 'TEST-FAC-NEW')
+            ->where('rows.1.number', 'TEST-FAC-OLD'));
+    }
+
     public function test_payment_form_exposes_the_new_payment_reasons(): void
     {
         $expected=['Acompte de commande','Solde de commande','Paiement fournisseur en Chine','Frais de fret / transport','Frais de service','Autre'];

@@ -1345,8 +1345,13 @@ class ModuleController extends Controller
     {
         $table = $config['table'];
         $query = DB::table($table);
-        if ($table === 'expenses') {
-            $query->orderByDesc($table.'.spent_at')->orderByDesc($table.'.id');
+        $chronologicalColumns = [
+            'orders' => 'ordered_at',
+            'invoices' => 'issued_at',
+            'expenses' => 'spent_at',
+        ];
+        if (isset($chronologicalColumns[$table])) {
+            $query->orderByDesc($table.'.'.$chronologicalColumns[$table])->orderByDesc($table.'.id');
         } else {
             $query->orderByDesc($table.'.id');
         }
