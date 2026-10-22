@@ -114,11 +114,15 @@ class DemoDataSeeder extends Seeder
                 ]);
 
                 DB::table('supplier_payments')->updateOrInsert(['reference' => "ACH-DEMO-$suffix"], [
-                    'supplier_id' => $supplier->id, 'paid_at' => $date, 'quantity' => $quantity, 'unit_price' => $unitCost, 'amount' => $unitCost * $quantity, 'method' => ['WeChat', 'Alipay', 'banque'][($i - 1) % 3],
+                    'supplier_id' => $supplier->id, 'destination_type' => 'order', 'paid_at' => $date, 'quantity' => $quantity, 'unit_price' => $unitCost, 'amount' => $unitCost * $quantity, 'method' => ['WeChat', 'Alipay', 'banque'][($i - 1) % 3],
                     'proof_path' => null, 'proof_url' => null, 'status' => 'paye', 'notes' => 'Achat de démonstration', 'created_at' => $now, 'updated_at' => $now,
                 ]);
                 $supplierPaymentId = DB::table('supplier_payments')->where('reference', "ACH-DEMO-$suffix")->value('id');
                 DB::table('supplier_payment_allocations')->updateOrInsert(['supplier_payment_id' => $supplierPaymentId, 'order_id' => $orderId], ['amount' => $unitCost * $quantity]);
+                DB::table('supplier_payment_items')->updateOrInsert(['supplier_payment_id' => $supplierPaymentId, 'product_name' => $product], [
+                    'quantity' => $quantity, 'unit_price' => $unitCost, 'china_delivery' => 0, 'exchange_rate' => 1,
+                    'total_amount' => $unitCost * $quantity, 'created_at' => $now, 'updated_at' => $now,
+                ]);
 
                 DB::table('shipments')->updateOrInsert(['order_id' => $orderId, 'tracking' => "TRACK-DEMO-$suffix"], [
                     'supplier_sent_at' => $date, 'china_warehouse_at' => $date, 'weight' => 8 + $i, 'cbm' => 0.05 + ($i / 100),

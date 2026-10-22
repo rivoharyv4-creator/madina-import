@@ -426,6 +426,37 @@ class ModuleCreationTest extends TestCase
         $this->assertDatabaseHas('shipments',['id'=>$shipment->id,'status'=>'en_transit','container_reference'=>'CONT-MG-001-B','package_count'=>13,'carton_count'=>32]);
     }
 
+    public function test_logistics_can_track_a_madina_stock_shipment_without_a_customer_order(): void
+    {
+        $product=DB::table('inventory_products')->first();
+
+        $this->actingAs($this->manager)->post('/modules/logistique',[
+            'shipment_type'=>'stock',
+            'inventory_product_id'=>$product->id,
+            'stock_quantity'=>24,
+            'status'=>'expedie',
+            'tracking'=>'TRACK-STOCK-MADINA-001',
+            'forwarder'=>'SinoMada Stock',
+            'expected_madagascar_at'=>'2026-10-30',
+            'package_count'=>4,
+            'cost'=>450000,
+        ])->assertRedirect('/modules/logistique');
+
+        $shipment=DB::table('shipments')->where('tracking','TRACK-STOCK-MADINA-001')->first();
+        $this->assertNotNull($shipment);
+        $this->assertNull($shipment->order_id);
+        $this->assertSame('stock',$shipment->shipment_type);
+        $this->assertSame($product->id,$shipment->inventory_product_id);
+        $this->assertSame(24.0,(float)$shipment->stock_quantity);
+
+        $this->actingAs($this->manager)->get("/modules/logistique/{$shipment->id}")->assertInertia(fn(Assert $page)=>$page
+            ->component('Module/ShipmentShow')
+            ->where('shipment.shipment_type','stock')
+            ->where('shipment.stock_product_name',$product->name)
+            ->where('products.0.quantity',24)
+        );
+    }
+
     public function test_manager_can_preview_an_order_with_products_photos_and_packages(): void
     {
         $order=DB::table('orders')->first();
@@ -475,6 +506,56 @@ class ModuleCreationTest extends TestCase
             ->where('module','achats')
             ->where('fields',fn($fields)=>collect($fields)->contains(fn($field)=>$field['name']==='proof'&&$field['preview']==='/purchase-proof/'.basename($payment->proof_path)))
         );
+    }
+
+    public function test_supplier_purchase_can_target_stock_and_contain_multiple_products(): void
+    {
+        $supplier=DB::table('suppliers')->first();
+        $this->actingAs($this->manager)->post('/modules/achats',[
+            'supplier_id'=>$supplier->id,
+            'purchase_target'=>'stock',
+            'paid_at'=>'2026-10-15',
+            'amount'=>1,
+            'method'=>'WeChat',
+            'reference'=>'STOCK-MULTI-001',
+            'status'=>'paye',
+            'items'=>[
+                ['name'=>'Assiettes','quantity'=>2,'unit_price'=>100,'china_delivery'=>20,'exchange_rate'=>500,'total_amount'=>1],
+                ['name'=>'Verres','quantity'=>3,'unit_price'=>50,'china_delivery'=>10,'exchange_rate'=>500,'total_amount'=>1],
+            ],
+        ])->assertSessionHasNoErrors()->assertRedirect('/modules/achats');
+
+        $payment=DB::table('supplier_payments')->where('reference','STOCK-MULTI-001')->first();
+        $this->assertSame('stock',$payment->destination_type);
+        $this->assertSame(5.0,(float)$payment->quantity);
+        $this->assertSame(190000.0,(float)$payment->amount);
+        $this->assertSame(0,DB::table('supplier_payment_allocations')->where('supplier_payment_id',$payment->id)->count());
+        $this->assertDatabaseHas('supplier_payment_items',['supplier_payment_id'=>$payment->id,'product_name'=>'Assiettes','total_amount'=>110000]);
+        $this->assertDatabaseHas('supplier_payment_items',['supplier_payment_id'=>$payment->id,'product_name'=>'Verres','total_amount'=>80000]);
+
+        $this->actingAs($this->manager)->get("/modules/achats/{$payment->id}/edit")->assertInertia(fn(Assert $page)=>$page
+            ->where('fields.1.name','purchase_target')
+            ->where('fields.1.default','stock')
+            ->has('initialItems',2)
+            ->where('initialItems.0.name','Assiettes')
+        );
+    }
+
+    public function test_invoice_accepts_the_stock_purchase_type(): void
+    {
+        $order=DB::table('orders')->first();
+        $this->actingAs($this->manager)->post('/modules/factures',[
+            'order_id'=>$order->id,
+            'type'=>'achat_stock',
+            'issued_at'=>'2026-10-15',
+            'subtotal'=>250000,
+            'paid_amount'=>0,
+            'status'=>'finale',
+        ])->assertSessionHasNoErrors()->assertRedirect('/modules/factures');
+
+        $invoice=DB::table('invoices')->where('type','achat_stock')->latest('id')->first();
+        $this->assertNotNull($invoice);
+        $this->assertSame('Achat stock',json_decode($invoice->lines,true)[0]['label']);
     }
 
     public function test_supplier_can_have_a_product_catalogue(): void

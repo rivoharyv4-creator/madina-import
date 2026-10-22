@@ -58,7 +58,7 @@ return new class extends Migration {
             $t->string('status')->default('brouillon'); $t->timestamps();
         });
         Schema::create('invoices', function (Blueprint $t) {
-            $t->id(); $t->string('number')->unique(); $t->foreignId('order_id')->constrained(); $t->foreignId('client_id')->constrained(); $t->enum('type',['produits','frais']);
+            $t->id(); $t->string('number')->unique(); $t->foreignId('order_id')->constrained(); $t->foreignId('client_id')->constrained(); $t->enum('type',['produits','frais','achat_stock']);
             $t->enum('status',['brouillon','provisoire','finale','payee','partielle','annulee'])->default('brouillon'); $t->date('issued_at');
             $t->decimal('subtotal',18,2)->default(0); $t->decimal('paid_amount',18,2)->default(0); $t->decimal('balance_due',18,2)->default(0); $t->json('lines')->nullable();
             $t->timestamps(); $t->softDeletes(); $t->index(['client_id','status','issued_at']);

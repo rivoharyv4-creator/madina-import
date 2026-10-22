@@ -36,8 +36,8 @@ class ModuleController extends Controller
             'paiements' => ['title' => 'Paiements clients', 'table' => 'client_payments', 'primary' => 'Nouveau paiement', 'editable' => true, 'columns' => ['client_id' => 'Client', 'paid_at' => 'Date', 'amount' => 'Montant', 'method' => 'Mode', 'status' => 'Statut']],
             'factures' => ['title' => 'Factures', 'table' => 'invoices', 'primary' => 'Nouvelle facture', 'editable' => true, 'columns' => ['number' => 'N° facture', 'type' => 'Type', 'subtotal' => 'Total', 'issued_at' => 'Date', 'status' => 'Statut']],
             'fournisseurs' => ['title' => 'Fournisseurs', 'table' => 'suppliers', 'primary' => 'Nouveau fournisseur', 'editable' => true, 'columns' => ['name' => 'Fournisseur', 'category' => 'Catégorie', 'contact' => 'Contact', 'quality_rating' => 'Qualité', 'active' => 'Statut']],
-            'achats' => ['title' => 'Achats fournisseurs', 'table' => 'supplier_payments', 'primary' => 'Nouveau paiement', 'editable' => true, 'columns' => ['supplier_id' => 'Fournisseur', 'paid_at' => 'Date', 'quantity' => 'Quantité', 'unit_price' => 'Prix unitaire', 'amount' => 'Montant total payé', 'method' => 'Mode', 'proof_path' => 'Justificatif', 'status' => 'Statut']],
-            'logistique' => ['title' => 'Suivi Logistique', 'table' => 'shipments', 'primary' => 'Nouveau suivi logistique', 'editable' => true, 'columns' => ['order_id' => 'N° commande', 'tracking' => 'Tracking number', 'forwarder' => 'Transitaire', 'container_reference' => 'Référence conteneur', 'expected_madagascar_at' => 'Arrivage prévu', 'cbm' => 'CBM / volume', 'package_count' => 'Colis', 'carton_count' => 'Cartons', 'cost' => 'Frais de fret', 'status' => 'Statut']],
+            'achats' => ['title' => 'Achats fournisseurs', 'table' => 'supplier_payments', 'primary' => 'Nouvel achat', 'editable' => true, 'columns' => ['supplier_id' => 'Fournisseur', 'destination_type' => 'Destination', 'paid_at' => 'Date', 'amount' => 'Montant total payé', 'method' => 'Mode', 'proof_path' => 'Justificatif', 'status' => 'Statut']],
+            'logistique' => ['title' => 'Suivi Logistique', 'table' => 'shipments', 'primary' => 'Nouveau suivi logistique', 'editable' => true, 'columns' => ['shipment_type' => 'Origine', 'order_id' => 'N° commande', 'inventory_product_id' => 'Produit stock', 'tracking' => 'Tracking number', 'forwarder' => 'Transitaire', 'expected_madagascar_at' => 'Arrivage prévu', 'package_count' => 'Colis', 'cost' => 'Frais de fret', 'status' => 'Statut']],
             'stock' => ['title' => 'Stock', 'table' => 'inventory_products', 'primary' => 'Ajouter un produit', 'editable' => true, 'columns' => ['photo_path' => 'Photo', 'reference' => 'SKU', 'name' => 'Produit', 'quantity' => 'Stock', 'reserved_quantity' => 'Réservée', 'available_quantity' => 'Disponible', 'total_purchase_cost' => 'Coût total', 'sale_total' => 'Valeur de vente']],
             'catalogue' => ['title' => 'Catalogue', 'table' => 'inventory_products', 'primary' => null, 'editable' => true, 'columns' => ['photo_path' => 'Photo', 'reference' => 'SKU', 'name' => 'Produit', 'category' => 'Catégorie', 'public_availability_status' => 'Disponibilité publique', 'is_published' => 'Publication', 'is_featured' => 'Mise en avant', 'show_price' => 'Prix visible']],
             'demandes' => ['title' => 'Demandes publiques', 'table' => 'contact_requests', 'primary' => null, 'editable' => false, 'viewable' => true, 'columns' => ['name' => 'Nom', 'contact' => 'Contact', 'need' => 'Besoin', 'message' => 'Message', 'status' => 'Statut', 'created_at' => 'Reçue le']],
@@ -181,19 +181,22 @@ class ModuleController extends Controller
     private function showShipment(int $id)
     {
         $shipment = DB::table('shipments')
-            ->join('orders', 'orders.id', '=', 'shipments.order_id')
-            ->join('clients', 'clients.id', '=', 'orders.client_id')
+            ->leftJoin('orders', 'orders.id', '=', 'shipments.order_id')
+            ->leftJoin('clients', 'clients.id', '=', 'orders.client_id')
+            ->leftJoin('inventory_products', 'inventory_products.id', '=', 'shipments.inventory_product_id')
             ->where('shipments.id', $id)
-            ->select('shipments.*', 'orders.number as order_number', 'clients.name as client_name')
+            ->select('shipments.*', 'orders.number as order_number', 'clients.name as client_name', 'inventory_products.name as stock_product_name', 'inventory_products.photo_path as stock_product_photo_path')
             ->first();
         abort_unless($shipment, 404);
 
-        $products = DB::table('order_items')
-            ->where('order_id', $shipment->order_id)
-            ->orderBy('id')
-            ->get(['name', 'specifications', 'quantity', 'photo_path'])
-            ->map(fn ($item) => [...(array) $item, 'photo_url' => $item->photo_path ? '/product-photo/'.basename($item->photo_path) : null])
-            ->values();
+        $products = $shipment->shipment_type === 'stock'
+            ? collect([['name' => $shipment->stock_product_name, 'specifications' => null, 'quantity' => $shipment->stock_quantity, 'photo_url' => $shipment->stock_product_photo_path ? '/product-photo/'.basename($shipment->stock_product_photo_path) : null]])
+            : DB::table('order_items')
+                ->where('order_id', $shipment->order_id)
+                ->orderBy('id')
+                ->get(['name', 'specifications', 'quantity', 'photo_path'])
+                ->map(fn ($item) => [...(array) $item, 'photo_url' => $item->photo_path ? '/product-photo/'.basename($item->photo_path) : null])
+                ->values();
 
         return Inertia::render('Module/ShipmentShow', ['shipment' => $shipment, 'products' => $products]);
     }
@@ -576,7 +579,7 @@ class ModuleController extends Controller
 
                 return ['label' => $item->name, 'quantity' => $quantity, 'unit_price' => $quantity > 0 ? $amount / $quantity : 0, 'amount' => $amount];
             })->values()->all()
-            : [['label' => 'Frais de commande', 'quantity' => 1, 'unit_price' => $subtotal, 'amount' => $subtotal]];
+            : [['label' => $data['type'] === 'achat_stock' ? 'Achat stock' : 'Frais de commande', 'quantity' => 1, 'unit_price' => $subtotal, 'amount' => $subtotal]];
 
         return DB::table('invoices')->insertGetId(['shipping_delay' => $data['shipping_delay'] ?? null, 'bank_details' => $data['bank_details'] ?? null, 'payment_terms' => $data['payment_terms'] ?? null, 'warranty' => $data['warranty'] ?? null, 'notes' => $data['notes'] ?? null, 'number' => $numbers->next($data['type'] === 'frais' ? 'fee_invoice' : 'invoice'), 'order_id' => $order->id, 'client_id' => $order->client_id, 'type' => $data['type'], 'status' => $paid > 0 && $paid < $subtotal ? 'partielle' : $data['status'], 'issued_at' => $data['issued_at'], 'subtotal' => $subtotal, 'paid_amount' => $paid, 'balance_due' => $subtotal - $paid, 'lines' => json_encode($lines), 'created_at' => now(), 'updated_at' => now()]);
     }
@@ -584,10 +587,51 @@ class ModuleController extends Controller
     private function createSupplierPayment(array $data): int
     {
         $proof = $data['proof'] ?? null;
-        $id = DB::table('supplier_payments')->insertGetId([...Arr::except($data, ['order_id', 'proof']), 'proof_path' => $this->storePurchaseProof($proof), 'created_at' => now(), 'updated_at' => now()]);
-        DB::table('supplier_payment_allocations')->insert(['supplier_payment_id' => $id, 'order_id' => $data['order_id'], 'amount' => $data['amount']]);
+        [$destination, $orderId] = $this->supplierPurchaseTarget($data['purchase_target']);
+        $items = $data['items'];
+        $quantity = collect($items)->sum(fn ($item) => (float) $item['quantity']);
+        $id = DB::table('supplier_payments')->insertGetId([
+            ...Arr::except($data, ['purchase_target', 'items', 'proof']),
+            'destination_type' => $destination,
+            'quantity' => $quantity,
+            'unit_price' => $items[0]['unit_price'],
+            'proof_path' => $this->storePurchaseProof($proof),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $this->replaceSupplierPaymentItems($id, $items);
+        if ($orderId) {
+            DB::table('supplier_payment_allocations')->insert(['supplier_payment_id' => $id, 'order_id' => $orderId, 'amount' => $data['amount']]);
+        }
 
         return $id;
+    }
+
+    private function supplierPurchaseTarget(string $target): array
+    {
+        if ($target === 'stock') {
+            return ['stock', null];
+        }
+
+        return ['order', (int) str_replace('order:', '', $target)];
+    }
+
+    private function replaceSupplierPaymentItems(int $paymentId, array $items): void
+    {
+        DB::table('supplier_payment_items')->where('supplier_payment_id', $paymentId)->delete();
+        foreach ($items as $item) {
+            DB::table('supplier_payment_items')->insert([
+                'supplier_payment_id' => $paymentId,
+                'product_name' => $item['name'],
+                'quantity' => $item['quantity'],
+                'unit_price' => $item['unit_price'],
+                'china_delivery' => $item['china_delivery'] ?? 0,
+                'exchange_rate' => $item['exchange_rate'],
+                'total_amount' => $item['total_amount'],
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
     }
 
     private function storePurchaseProof(?UploadedFile $proof): ?string
@@ -665,7 +709,8 @@ class ModuleController extends Controller
             }
         }
         if ($module === 'achats') {
-            $values['order_id'] = DB::table('supplier_payment_allocations')->where('supplier_payment_id', $record->id)->value('order_id');
+            $orderId = DB::table('supplier_payment_allocations')->where('supplier_payment_id', $record->id)->value('order_id');
+            $values['purchase_target'] = ($record->destination_type ?? 'order') === 'stock' ? 'stock' : 'order:'.$orderId;
         }
         if ($module === 'stock') {
             foreach (['quantity', 'reserved_quantity', 'available_quantity', 'alert_threshold'] as $field) {
@@ -762,14 +807,27 @@ class ModuleController extends Controller
             $paid = (float) ($data['paid_amount'] ?? 0);
             if ($paid > $subtotal) {
                 throw ValidationException::withMessages(['paid_amount' => 'Le montant reçu ne peut pas dépasser le total.']);
-            } DB::table('invoices')->where('id', $id)->update(['shipping_delay' => $data['shipping_delay'] ?? null, 'bank_details' => $data['bank_details'] ?? null, 'payment_terms' => $data['payment_terms'] ?? null, 'warranty' => $data['warranty'] ?? null, 'notes' => $data['notes'] ?? null, 'order_id' => $order->id, 'client_id' => $order->client_id, 'type' => $data['type'], 'issued_at' => $data['issued_at'], 'subtotal' => $subtotal, 'paid_amount' => $paid, 'balance_due' => $subtotal - $paid, 'status' => $paid >= $subtotal ? 'payee' : ($paid > 0 ? 'partielle' : $data['status']), 'lines' => json_encode([['label' => $data['type'] === 'frais' ? 'Frais de commande' : 'Produits commandés', 'amount' => $subtotal]]), 'updated_at' => now()]);
+            } DB::table('invoices')->where('id', $id)->update(['shipping_delay' => $data['shipping_delay'] ?? null, 'bank_details' => $data['bank_details'] ?? null, 'payment_terms' => $data['payment_terms'] ?? null, 'warranty' => $data['warranty'] ?? null, 'notes' => $data['notes'] ?? null, 'order_id' => $order->id, 'client_id' => $order->client_id, 'type' => $data['type'], 'issued_at' => $data['issued_at'], 'subtotal' => $subtotal, 'paid_amount' => $paid, 'balance_due' => $subtotal - $paid, 'status' => $paid >= $subtotal ? 'payee' : ($paid > 0 ? 'partielle' : $data['status']), 'lines' => json_encode([['label' => $data['type'] === 'frais' ? 'Frais de commande' : ($data['type'] === 'achat_stock' ? 'Achat stock' : 'Produits commandés'), 'quantity' => 1, 'unit_price' => $subtotal, 'amount' => $subtotal]]), 'updated_at' => now()]);
 
             return;
         }
         if ($module === 'achats') {
             $proof = $data['proof'] ?? null;
-            DB::table('supplier_payments')->where('id', $id)->update([...Arr::except($data, ['order_id', 'proof']), 'proof_path' => $proof ? $this->storePurchaseProof($proof) : $old->proof_path, 'updated_at' => now()]);
-            DB::table('supplier_payment_allocations')->where('supplier_payment_id', $id)->update(['order_id' => $data['order_id'], 'amount' => $data['amount']]);
+            [$destination, $orderId] = $this->supplierPurchaseTarget($data['purchase_target']);
+            $items = $data['items'];
+            DB::table('supplier_payments')->where('id', $id)->update([
+                ...Arr::except($data, ['purchase_target', 'items', 'proof']),
+                'destination_type' => $destination,
+                'quantity' => collect($items)->sum(fn ($item) => (float) $item['quantity']),
+                'unit_price' => $items[0]['unit_price'],
+                'proof_path' => $proof ? $this->storePurchaseProof($proof) : $old->proof_path,
+                'updated_at' => now(),
+            ]);
+            $this->replaceSupplierPaymentItems($id, $items);
+            DB::table('supplier_payment_allocations')->where('supplier_payment_id', $id)->delete();
+            if ($orderId) {
+                DB::table('supplier_payment_allocations')->insert(['supplier_payment_id' => $id, 'order_id' => $orderId, 'amount' => $data['amount']]);
+            }
 
             return;
         }
@@ -1007,7 +1065,15 @@ class ModuleController extends Controller
             $maps[$key] = DB::table($table)->whereIn('id', $ids)->pluck($label, 'id');
         }
 
-        return array_map(function ($row) use ($maps) {
+        $purchaseOrders = collect();
+        if (array_key_exists('destination_type', $rows[0])) {
+            $purchaseOrders = DB::table('supplier_payment_allocations')
+                ->join('orders', 'orders.id', '=', 'supplier_payment_allocations.order_id')
+                ->whereIn('supplier_payment_id', collect($rows)->pluck('id'))
+                ->pluck('orders.number', 'supplier_payment_id');
+        }
+
+        return array_map(function ($row) use ($maps, $purchaseOrders) {
             if (isset($row['quote_id'])) {
                 $row['quote_record_id'] = $row['quote_id'];
             } if (isset($row['order_id'])) {
@@ -1020,6 +1086,8 @@ class ModuleController extends Controller
                 $row['order_id'] = $row['order_record_id'].'::'.$row['order_id'];
             } if (array_key_exists('proof_path', $row)) {
                 $row['proof_path'] = $row['proof_path'] ? '/purchase-proof/'.basename($row['proof_path']) : ($row['proof_url'] ?? null);
+            } if (array_key_exists('destination_type', $row)) {
+                $row['destination_type'] = $row['destination_type'] === 'stock' ? 'Stock' : ($purchaseOrders[$row['id']] ?? 'Commande');
             }
 
             return $row;
@@ -1035,7 +1103,8 @@ class ModuleController extends Controller
         $suppliers = $module === 'achats' ? DB::table('suppliers')->where('active', true)->orderBy('name')->get()->map(fn ($x) => ['value' => $x->id, 'label' => $x->name, 'contact' => $x->contact])->all() : [];
         $orders = in_array($module, ['paiements', 'factures', 'achats', 'logistique', 'depenses'], true) ? DB::table('orders')->orderByDesc('id')->get()->map(fn ($x) => ['value' => $x->id, 'label' => $x->number])->all() : [];
         $quotes = $module === 'commandes' ? DB::table('quotes')->whereNull('deleted_at')->orderByDesc('id')->get()->map(fn ($x) => ['value' => $x->id, 'label' => $x->number])->all() : [];
-        $products = $module === 'ventes' ? DB::table('inventory_products')->where('quantity', '>', 0)->orderBy('name')->get()->map(fn ($x) => ['value' => $x->id, 'label' => $x->name.' ('.$x->quantity.')'])->all() : [];
+        $products = $module === 'ventes' ? DB::table('inventory_products')->whereNull('deleted_at')->where('quantity', '>', 0)->orderBy('name')->get()->map(fn ($x) => ['value' => $x->id, 'label' => $x->name.' ('.$x->quantity.')'])->all() : [];
+        $stockProducts = $module === 'logistique' ? DB::table('inventory_products')->whereNull('deleted_at')->orderBy('name')->get()->map(fn ($x) => ['value' => $x->id, 'label' => $x->name.' — '.$x->reference])->all() : [];
         $employees = $module === 'salaires' ? DB::table('employees')->where('active', true)->get()->map(fn ($x) => ['value' => $x->id, 'label' => $x->name])->all() : [];
         $invoices = $module === 'paiements' ? DB::table('invoices')->orderByDesc('id')->get()->map(fn ($x) => ['value' => $x->id, 'label' => $x->number])->all() : [];
         $users = $module === 'demandes-devis' ? DB::table('users')->orderBy('name')->get()->map(fn ($x) => ['value' => $x->id, 'label' => $x->name])->all() : [];
@@ -1093,10 +1162,13 @@ class ModuleController extends Controller
             'devis' => [$select('client_id', 'Client enregistré (optionnel)', $clients, false), $input('client_name', 'Nom du client'), $input('client_contact', 'Contact du client'), $select('client_type', 'Type de client', $o(['revendeur', 'entrepreneur', 'particulier', 'hotel']), true, 'particulier'), $input('valid_until', 'Valide jusqu’au', 'date'), $select('shipping_mode', 'Mode d’envoi', [['value' => 'maritime', 'label' => 'Maritime'], ['value' => 'aerien', 'label' => 'Aérien']]), $input('shipping_delay', 'Délai d’expédition', 'text', false), $select('status', 'Statut', [['value' => 'brouillon', 'label' => 'Brouillon'], ['value' => 'envoye', 'label' => 'Envoyé'], ['value' => 'negociation', 'label' => 'Négociation'], ['value' => 'accepte', 'label' => 'Accepté'], ['value' => 'refuse', 'label' => 'Refusé'], ['value' => 'sans_reponse', 'label' => 'Sans réponse'], ['value' => 'relance_1', 'label' => 'Relance 1'], ['value' => 'relance_2', 'label' => 'Relance 2']], true, 'brouillon'), $input('bank_details', 'Informations bancaires / compte bancaire', 'textarea', false), $input('payment_terms', 'Conditions de paiement', 'textarea', false), $input('warranty', 'Garantie', 'textarea', false), $input('notes', 'Note / remarque', 'textarea', false)],
             'commandes' => [$select('quote_id', 'Créer à partir du devis n°', $quotes, false), $select('client_id', 'Client', $clients), $select('commission_enabled', 'Appliquer une commission', [['value' => 0, 'label' => 'Non'], ['value' => 1, 'label' => 'Oui']], true, 0), $input('commission_rate', 'Taux commission (%)', 'number', false, 8), $input('deposit', 'Acompte reçu (Ar)', 'number', false, 0), $input('ordered_at', 'Date de commande', 'date', true, $today), $select('shipping_mode', 'Mode d’envoi', $o(['aerien', 'maritime']), false), $select('status', 'Statut', [['value' => 'brouillon', 'label' => 'Brouillon'], ['value' => 'demande_recue', 'label' => 'Demande reçue'], ['value' => 'attente_validation', 'label' => 'Attente validation'], ['value' => 'confirmee', 'label' => 'Confirmée'], ['value' => 'acompte_recu', 'label' => 'Acompte reçu'], ['value' => 'achat_lance', 'label' => 'Achat lancé'], ['value' => 'achat_effectue', 'label' => 'Achat effectué']], true, 'brouillon'), $input('notes', 'Notes internes', 'textarea', false)],
             'paiements' => [$select('client_id', 'Client', $clients), $select('order_id', 'Commande à créditer (optionnelle)', $orders, false), $select('invoice_id', 'Facture à créditer (optionnelle)', $invoices, false), $input('paid_at', 'Date', 'date', true, $today), $input('amount', 'Montant reçu (Ar)', 'number'), $input('allocated_amount', 'Montant affecté (Ar)', 'number', false, 0), $select('method', 'Mode de paiement', $o(['Mobile Money', 'Virement bancaire', 'Espèces', 'Chèque'])), $input('reference', 'Référence', 'text', false), $select('type', 'Motif du paiement', [['value' => 'acompte_commande', 'label' => 'Acompte de commande'], ['value' => 'solde_commande', 'label' => 'Solde de commande'], ['value' => 'fournisseur_chine', 'label' => 'Paiement fournisseur en Chine'], ['value' => 'fret_transport', 'label' => 'Frais de fret / transport'], ['value' => 'frais_service', 'label' => 'Frais de service'], ['value' => 'autre', 'label' => 'Autre']]), $input('payment_object', 'Objet du paiement', 'text'), $input('notes', 'Précision / notes (obligatoire si Autre)', 'textarea', false)],
-            'factures' => [$select('order_id', 'Commande', $orders), $select('type', 'Type de facture', $o(['produits', 'frais'])), $input('issued_at', 'Date', 'date', true, $today), $input('subtotal', 'Total (Ar)', 'number'), $input('paid_amount', 'Acompte (Ar)', 'number', false, 0), $select('status', 'Statut', $o(['brouillon', 'provisoire', 'finale', 'payee', 'partielle']), true, 'brouillon'), $input('shipping_delay', 'Délai d’expédition', 'text', false), $input('bank_details', 'Informations bancaires / compte bancaire', 'textarea', false), $input('payment_terms', 'Conditions de paiement', 'textarea', false), $input('warranty', 'Garantie', 'textarea', false), $input('notes', 'Note / remarque', 'textarea', false)],
-            'achats' => [$select('supplier_id', 'Fournisseur', $suppliers), $select('order_id', 'Commande concernée', $orders), $input('paid_at', 'Date', 'date', true, $today), $input('quantity', 'Quantité', 'number'), $input('unit_price', 'Prix unitaire (Ar)', 'number'), $input('amount', 'Montant total payé (Ar)', 'number') + ['readOnly' => true, 'money' => true], $select('method', 'Mode', $o(['WeChat', 'Alipay', 'banque'])), $input('reference', 'Référence', 'text', false), $input('proof', 'Justificatif — capture (optionnelle)', 'file', false), $input('proof_url', 'Justificatif — lien (optionnel)', 'url', false), $select('status', 'Statut du paiement', $o(['paye', 'partiel', 'en_attente'])), $input('notes', 'Notes de suivi', 'textarea', false)],
+            'factures' => [$select('order_id', 'Commande', $orders), $select('type', 'Type de facture', [['value' => 'produits', 'label' => 'Produits'], ['value' => 'frais', 'label' => 'Frais'], ['value' => 'achat_stock', 'label' => 'Achat stock']]), $input('issued_at', 'Date', 'date', true, $today), $input('subtotal', 'Total (Ar)', 'number'), $input('paid_amount', 'Acompte (Ar)', 'number', false, 0), $select('status', 'Statut', $o(['brouillon', 'provisoire', 'finale', 'payee', 'partielle']), true, 'brouillon'), $input('shipping_delay', 'Délai d’expédition', 'text', false), $input('bank_details', 'Informations bancaires / compte bancaire', 'textarea', false), $input('payment_terms', 'Conditions de paiement', 'textarea', false), $input('warranty', 'Garantie', 'textarea', false), $input('notes', 'Note / remarque', 'textarea', false)],
+            'achats' => [$select('supplier_id', 'Fournisseur', $suppliers), $select('purchase_target', 'Commande concernée / destination', [['value' => 'stock', 'label' => 'Stock'], ...array_map(fn ($order) => ['value' => 'order:'.$order['value'], 'label' => $order['label']], $orders)]), $input('paid_at', 'Date', 'date', true, $today), $input('amount', 'Montant total payé (Ar)', 'number') + ['readOnly' => true, 'money' => true], $select('method', 'Mode', $o(['WeChat', 'Alipay', 'banque'])), $input('reference', 'Référence', 'text', false), $input('proof', 'Justificatif — capture (optionnelle)', 'file', false), $input('proof_url', 'Justificatif — lien (optionnel)', 'url', false), $select('status', 'Statut du paiement', $o(['paye', 'partiel', 'en_attente'])), $input('notes', 'Notes de suivi', 'textarea', false)],
             'logistique' => [
-                $select('order_id', 'Numéro de commande', $orders) + ['section' => '1. Liaison'],
+                $select('shipment_type', 'Origine de l’expédition', [['value' => 'order', 'label' => 'Commande client'], ['value' => 'stock', 'label' => 'Stock Madina']], true, 'order') + ['section' => '1. Liaison'],
+                $select('order_id', 'Numéro de commande', $orders) + ['section' => '1. Liaison', 'visibleFor' => 'order'],
+                $select('inventory_product_id', 'Produit Madina à envoyer', $stockProducts) + ['section' => '1. Liaison', 'visibleFor' => 'stock'],
+                $input('stock_quantity', 'Quantité envoyée', 'number') + ['section' => '1. Liaison', 'visibleFor' => 'stock'],
                 $select('status', 'Statut', [
                     ['value' => 'commande_lancee', 'label' => 'Commande lancée'],
                     ['value' => 'en_attente', 'label' => 'En attente de livraison'],
@@ -1132,8 +1204,19 @@ class ModuleController extends Controller
         if (array_key_exists($module, $this->itemFieldsCache)) {
             return $this->itemFieldsCache[$module];
         }
-        if (! in_array($module, ['devis', 'commandes'], true)) {
+        if (! in_array($module, ['devis', 'commandes', 'achats'], true)) {
             return $this->itemFieldsCache[$module] = [];
+        }
+        if ($module === 'achats') {
+            return $this->itemFieldsCache[$module] = [
+                ['name' => 'name', 'label' => 'Nom du produit / article', 'type' => 'text', 'required' => true],
+                ['name' => 'quantity', 'label' => 'Quantité', 'type' => 'number', 'required' => true],
+                ['name' => 'unit_price', 'label' => 'Prix unitaire (CNY)', 'type' => 'number', 'required' => true],
+                ['name' => 'china_delivery', 'label' => 'Frais de livraison Chine (CNY)', 'type' => 'number', 'required' => false],
+                ['name' => 'total_cny', 'label' => 'Sous-total avant conversion (CNY)', 'type' => 'number', 'required' => false, 'readOnly' => true],
+                ['name' => 'exchange_rate', 'label' => 'Cours de devise (Ar / CNY)', 'type' => 'number', 'required' => true],
+                ['name' => 'total_amount', 'label' => 'Montant total converti (Ar)', 'type' => 'number', 'required' => true, 'readOnly' => true, 'money' => true],
+            ];
         }
         $suppliers = DB::table('suppliers')->where('active', true)->orderBy('name')->get()->map(fn ($x) => ['value' => $x->id, 'label' => $x->name, 'contact' => $x->contact])->all();
         $base = [];
@@ -1159,7 +1242,7 @@ class ModuleController extends Controller
 
     private function emptyItem(string $module): array
     {
-        return collect($this->itemFields($module))->mapWithKeys(fn ($field) => [$field['name'] => in_array($field['name'], ['quantity'], true) ? 1 : (in_array($field['type'], ['number'], true) ? 0 : '')])->all();
+        return collect($this->itemFields($module))->mapWithKeys(fn ($field) => [$field['name'] => in_array($field['name'], ['quantity', 'exchange_rate'], true) ? 1 : (in_array($field['type'], ['number'], true) ? 0 : '')])->all();
     }
 
     private function existingItems(string $module, int $id): array
@@ -1169,6 +1252,15 @@ class ModuleController extends Controller
         }
         if ($module === 'commandes') {
             return DB::table('order_items')->where('order_id', $id)->orderBy('id')->get()->map(fn ($item) => ['id' => $item->id, 'inventory_product_id' => $item->inventory_product_id, 'name' => $item->name, 'photo' => null, 'photo_url' => $item->photo_path ? '/product-photo/'.basename($item->photo_path) : null, 'specifications' => $item->specifications, 'quantity' => $item->quantity, 'supplier_id' => $item->supplier_id, 'supplier_name' => $item->supplier_name, 'supplier_contact' => $item->supplier_contact, 'source_url' => $item->source_url, 'supplier_price' => $item->supplier_price, 'china_delivery' => $item->china_delivery, 'packaging' => $item->packaging, 'weight' => $item->weight, 'cbm' => $item->cbm, 'freight' => $item->freight, 'margin' => $item->margin, 'commission' => $item->commission, 'client_total' => $item->client_total])->all();
+        }
+        if ($module === 'achats') {
+            $items = DB::table('supplier_payment_items')->where('supplier_payment_id', $id)->orderBy('id')->get()->map(fn ($item) => ['id' => $item->id, 'name' => $item->product_name, 'quantity' => $item->quantity, 'unit_price' => $item->unit_price, 'china_delivery' => $item->china_delivery, 'total_cny' => (float) $item->quantity * (float) $item->unit_price + (float) $item->china_delivery, 'exchange_rate' => $item->exchange_rate, 'total_amount' => $item->total_amount])->all();
+            if ($items) {
+                return $items;
+            }
+            $payment = DB::table('supplier_payments')->find($id);
+
+            return $payment ? [['name' => 'Achat fournisseur', 'quantity' => $payment->quantity, 'unit_price' => $payment->unit_price, 'china_delivery' => 0, 'total_cny' => (float) $payment->quantity * (float) $payment->unit_price, 'exchange_rate' => 1, 'total_amount' => $payment->amount]] : [];
         }
 
         return [];
